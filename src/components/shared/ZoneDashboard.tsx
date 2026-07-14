@@ -9,6 +9,7 @@ import {
   ArrowRight,
   CalendarDays,
   PackageCheck,
+  PackagePlus,
   Loader2,
 } from "lucide-react";
 import { useInsumosPorZona } from "@/hooks/useInsumosPorZona";
@@ -19,6 +20,7 @@ import {
   esFinDeSemana,
   getStockMinimoVigente,
 } from "@/lib/reglasInventario";
+import AjusteRapidoModal from "@/components/shared/AjusteRapidoModal";
 import type { Insumo, Zona } from "@/types/insumo";
 
 // ─────────────────────────────────────────────────────────────
@@ -46,6 +48,8 @@ export interface ZoneDashboardProps {
   icono: React.ReactNode;
   /** Nombre de la zona en minúsculas para textos ("cocina" / "salón") */
   nombreZona: string;
+  /** uid del usuario en sesión — queda registrado en cada ajuste rápido que haga */
+  usuarioId: string;
   onIrAlChecklist?: () => void;
 }
 
@@ -54,6 +58,7 @@ export default function ZoneDashboard({
   titulo,
   icono,
   nombreZona,
+  usuarioId,
   onIrAlChecklist,
 }: ZoneDashboardProps) {
   const { insumos, cargando, error } = useInsumosPorZona(zona);
@@ -61,6 +66,7 @@ export default function ZoneDashboard({
   const [ultimoCierre, setUltimoCierre] = useState<UltimoCierre | null>(null);
   const [cargandoCierre, setCargandoCierre] = useState(true);
   const [errorCierre, setErrorCierre] = useState<string | null>(null);
+  const [ajusteAbierto, setAjusteAbierto] = useState(false);
 
   useEffect(() => {
     let cancelado = false;
@@ -142,12 +148,22 @@ export default function ZoneDashboard({
           </div>
         </div>
 
-        {finDeSemana && (
-          <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-orange-50 px-3 py-1.5 text-xs font-medium text-orange-700">
-            <CalendarDays className="h-3.5 w-3.5" strokeWidth={2} />
-            Fin de semana — mínimos elevados
-          </span>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {finDeSemana && (
+            <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-orange-50 px-3 py-1.5 text-xs font-medium text-orange-700">
+              <CalendarDays className="h-3.5 w-3.5" strokeWidth={2} />
+              Fin de semana — mínimos elevados
+            </span>
+          )}
+
+          <button
+            onClick={() => setAjusteAbierto(true)}
+            className="inline-flex w-fit items-center gap-1.5 rounded-full border border-stone-300 bg-white px-3 py-1.5 text-xs font-medium text-stone-700 transition-colors hover:border-orange-300 hover:bg-orange-50/60 hover:text-orange-700"
+          >
+            <PackagePlus className="h-3.5 w-3.5" strokeWidth={2} />
+            Ajuste rápido
+          </button>
+        </div>
       </div>
 
       {/* Sección: Por preparar ahora (rojo) */}
@@ -231,6 +247,14 @@ export default function ZoneDashboard({
           </button>
         </div>
       </div>
+
+      <AjusteRapidoModal
+        abierto={ajusteAbierto}
+        onClose={() => setAjusteAbierto(false)}
+        zona={zona}
+        insumos={insumos}
+        usuarioId={usuarioId}
+      />
     </div>
   );
 }

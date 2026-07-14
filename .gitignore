@@ -33,6 +33,10 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# Service Account Key del Admin SDK — NUNCA se sube al repo.
+# Ver scripts/bootstrap-admin.mjs
+/secrets/
+
 # vercel
 .vercel
 

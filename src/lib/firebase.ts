@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
 import { getFirestore, type Firestore } from "firebase/firestore";
-import { getAuth, type Auth } from "firebase/auth";
+import { getAuth, GoogleAuthProvider, type Auth } from "firebase/auth";
 
 // Variables NEXT_PUBLIC_* — van en .env.local y en las variables de
 // entorno del proyecto en Vercel. Son públicas por diseño (el SDK cliente
@@ -21,4 +21,9 @@ const app: FirebaseApp = getApps().length ? getApp() : initializeApp(firebaseCon
 
 export const db: Firestore = getFirestore(app);
 export const auth: Auth = getAuth(app);
+
+// Instancia única del proveedor de Google — se reutiliza en cada login,
+// no hace falta (ni conviene) crear una nueva en cada click.
+export const googleProvider = new GoogleAuthProvider();
+
 export default app;
