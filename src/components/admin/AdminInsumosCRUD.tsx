@@ -18,6 +18,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { useInsumos } from "@/hooks/useInsumos";
+import AlertasCompra from "@/components/admin/AlertasCompra";
 import type { Zona, TipoInsumo, Insumo } from "@/types/insumo";
 
 // Estado editable del formulario — todo como string para inputs controlados,
@@ -226,6 +227,9 @@ export default function AdminInsumosCRUD() {
           Nuevo insumo
         </button>
       </div>
+
+      {/* Alertas de compra — solo se renderiza si hay algo por debajo del mínimo */}
+      <AlertasCompra insumos={insumos} />
 
       {/* Filtros */}
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

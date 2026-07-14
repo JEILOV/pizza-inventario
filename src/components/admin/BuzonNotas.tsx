@@ -6,6 +6,7 @@ import {
   Loader2,
   AlertTriangle,
   MessageSquareText,
+  MessageCircle,
   ClipboardList,
   Minus,
   Plus,
@@ -38,6 +39,50 @@ function formatearFechaCompleta(fecha: Date) {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+// true si el evento trae algo que valga la pena reenviar — el motivo de
+// un ajuste siempre existe (es obligatorio en el modal), pero un cierre
+// puede no tener ninguna nota cargada.
+function tieneNotaParaReenviar(evento: EventoBuzon): boolean {
+  if (evento.origen === "ajuste") return true;
+  return Boolean(evento.notaGeneral) || evento.notasDeItems.length > 0;
+}
+
+// Arma el texto plano que se manda por WhatsApp — mismo contenido que ya
+// se ve en la tarjeta, sin inventar datos que el evento no tenga.
+function construirMensajeWhatsApp(
+  evento: EventoBuzon,
+  nombreUsuario: string,
+  nombresInsumos: Record<string, string>
+): string {
+  const encabezado = `Nota de Pizza Republic (${ETIQUETA_ZONA[evento.zona]})`;
+
+  if (evento.origen === "ajuste") {
+    const verbo = evento.tipoAjuste === "descuento" ? "Se descontaron" : "Se agregaron";
+    return [
+      encabezado,
+      `${verbo} ${evento.cantidad} de ${evento.insumoNombre}`,
+      `Motivo: ${evento.motivo}`,
+      `Registrado por ${nombreUsuario}`,
+    ].join("\n");
+  }
+
+  const lineas = [encabezado, `Cierre de turno — ${evento.turno}`];
+  if (evento.notaGeneral) {
+    lineas.push(`Nota general: ${evento.notaGeneral}`);
+  }
+  for (const item of evento.notasDeItems) {
+    const nombreInsumo = nombresInsumos[item.insumoId] ?? "Insumo";
+    lineas.push(`- ${nombreInsumo}: ${item.nota}`);
+  }
+  lineas.push(`Registrado por ${nombreUsuario}`);
+  return lineas.join("\n");
+}
+
+function abrirWhatsApp(texto: string) {
+  const url = `https://wa.me/?text=${encodeURIComponent(texto)}`;
+  window.open(url, "_blank", "noopener,noreferrer");
 }
 
 const ETIQUETA_ZONA: Record<Zona, string> = {
@@ -207,10 +252,24 @@ function TarjetaEvento({
         )}
       </div>
 
-      {/* Pie: quién lo hizo */}
-      <p className="mt-3 text-xs text-stone-400">
-        Registrado por <span className="font-medium text-stone-600">{nombreUsuario}</span>
-      </p>
+      {/* Pie: quién lo hizo + reenviar por WhatsApp */}
+      <div className="mt-3 flex items-center justify-between gap-2">
+        <p className="text-xs text-stone-400">
+          Registrado por <span className="font-medium text-stone-600">{nombreUsuario}</span>
+        </p>
+
+        {tieneNotaParaReenviar(evento) && (
+          <button
+            onClick={() =>
+              abrirWhatsApp(construirMensajeWhatsApp(evento, nombreUsuario, nombresInsumos))
+            }
+            className="flex flex-none items-center gap-1.5 rounded-lg border border-stone-200 px-2.5 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:border-brand/30 hover:bg-brand/5 hover:text-brand"
+          >
+            <MessageCircle className="h-3.5 w-3.5" strokeWidth={2.25} />
+            Reenviar por WhatsApp
+          </button>
+        )}
+      </div>
     </div>
   );
 }
