@@ -94,12 +94,11 @@ export default function ZoneDashboard({
   const finDeSemana = esFinDeSemana(hoy);
 
   const { rojos, amarillos, totalExternos, totalInternos } = useMemo(() => {
-    const internos = insumos.filter((i) => i.tipo === "interno");
     return {
-      rojos: internos.filter((i) => calcularEstado(i, hoy) === "rojo"),
-      amarillos: internos.filter((i) => calcularEstado(i, hoy) === "amarillo"),
+      rojos: insumos.filter((i) => calcularEstado(i, hoy) === "rojo"),
+      amarillos: insumos.filter((i) => calcularEstado(i, hoy) === "amarillo"),
       totalExternos: insumos.filter((i) => i.tipo === "externo").length,
-      totalInternos: internos.length,
+      totalInternos: insumos.filter((i) => i.tipo === "interno").length,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [insumos]);
@@ -158,7 +157,7 @@ export default function ZoneDashboard({
 
           <button
             onClick={() => setAjusteAbierto(true)}
-            className="inline-flex w-fit items-center gap-1.5 rounded-full border border-stone-300 bg-white px-3 py-1.5 text-xs font-medium text-stone-700 transition-colors hover:border-orange-300 hover:bg-orange-50/60 hover:text-orange-700"
+            className="inline-flex w-fit items-center gap-1.5 rounded-full border border-stone-300 bg-white px-3 py-1.5 text-xs font-medium text-stone-700 transition-colors hover:border-brand/30 hover:bg-brand/5 hover:text-brand"
           >
             <PackagePlus className="h-3.5 w-3.5" strokeWidth={2} />
             Ajuste rápido
@@ -166,26 +165,26 @@ export default function ZoneDashboard({
         </div>
       </div>
 
-      {/* Sección: Por preparar ahora (rojo) */}
+      {/* Sección: Por reponer ahora (rojo) */}
       <Section
-        titulo="Por preparar ahora"
-        subtitulo="Ya está por debajo del mínimo. Poner a producir cuanto antes."
+        titulo="Por reponer ahora"
+        subtitulo="Ya está por debajo del mínimo. Producir o pedir al proveedor cuanto antes, según corresponda."
         icono={<Flame className="h-4 w-4" strokeWidth={2} />}
         color="rojo"
-        vacio={`No hay insumos internos de ${nombreZona} en estado crítico.`}
+        vacio={`No hay insumos de ${nombreZona} en estado crítico.`}
       >
         {rojos.map((insumo) => (
           <TarjetaInsumo key={insumo.id} insumo={insumo} fecha={hoy} color="rojo" />
         ))}
       </Section>
 
-      {/* Sección: Preparar pronto (amarillo) */}
+      {/* Sección: Reponer pronto (amarillo) */}
       <Section
-        titulo="Preparar pronto"
-        subtitulo="Se acerca al mínimo. Conviene dejarlo listo antes de que falte."
+        titulo="Reponer pronto"
+        subtitulo="Se acerca al mínimo. Conviene dejarlo listo o pedirlo antes de que falte."
         icono={<AlertTriangle className="h-4 w-4" strokeWidth={2} />}
         color="amarillo"
-        vacio={`No hay insumos internos de ${nombreZona} acercándose al mínimo.`}
+        vacio={`No hay insumos de ${nombreZona} acercándose al mínimo.`}
       >
         {amarillos.map((insumo) => (
           <TarjetaInsumo key={insumo.id} insumo={insumo} fecha={hoy} color="amarillo" />
@@ -239,7 +238,7 @@ export default function ZoneDashboard({
 
           <button
             onClick={onIrAlChecklist}
-            className="flex w-full flex-none items-center justify-center gap-2 rounded-xl bg-orange-700 px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-orange-800 sm:w-auto"
+            className="flex w-full flex-none items-center justify-center gap-2 rounded-xl bg-brand px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-hover sm:w-auto"
           >
             <ClipboardList className="h-4 w-4" strokeWidth={2} />
             Ir al checklist de cierre

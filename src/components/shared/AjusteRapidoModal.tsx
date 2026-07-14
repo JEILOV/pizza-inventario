@@ -128,7 +128,7 @@ export default function AjusteRapidoModal({
               </button>
               <button
                 onClick={cerrar}
-                className="rounded-lg bg-orange-700 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-800"
+                className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-hover"
               >
                 Cerrar
               </button>
@@ -142,7 +142,7 @@ export default function AjusteRapidoModal({
               <select
                 value={insumoId}
                 onChange={(e) => setInsumoId(e.target.value)}
-                className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
+                className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
               >
                 <option value="">Selecciona un insumo...</option>
                 {insumos.map((i) => (
@@ -198,7 +198,7 @@ export default function AjusteRapidoModal({
                 placeholder="0"
                 className={[
                   "w-full rounded-lg border bg-white px-3 py-2 text-sm text-stone-900 outline-none transition-colors",
-                  "focus:border-orange-500 focus:ring-2 focus:ring-orange-100",
+                  "focus:border-brand focus:ring-2 focus:ring-brand/20",
                   excedeStock ? "border-red-400" : "border-stone-300",
                 ].join(" ")}
               />
@@ -222,7 +222,7 @@ export default function AjusteRapidoModal({
                     className={[
                       "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
                       motivo === sugerido
-                        ? "border-orange-700 bg-orange-700 text-white"
+                        ? "border-brand bg-brand text-white"
                         : "border-stone-300 text-stone-600 hover:bg-stone-50",
                     ].join(" ")}
                   >
@@ -235,7 +235,7 @@ export default function AjusteRapidoModal({
                 onChange={(e) => setMotivo(e.target.value)}
                 placeholder="Describe el motivo del ajuste..."
                 rows={2}
-                className="w-full resize-none rounded-lg border border-stone-300 px-3 py-2 text-sm text-stone-700 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
+                className="w-full resize-none rounded-lg border border-stone-300 px-3 py-2 text-sm text-stone-700 outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
               />
             </div>
 
@@ -259,7 +259,7 @@ export default function AjusteRapidoModal({
                 className={[
                   "flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors",
                   listoParaEnviar && !enviando
-                    ? "bg-orange-700 text-white hover:bg-orange-800"
+                    ? "bg-brand text-white hover:bg-brand-hover"
                     : "cursor-not-allowed bg-stone-200 text-stone-400",
                 ].join(" ")}
               >

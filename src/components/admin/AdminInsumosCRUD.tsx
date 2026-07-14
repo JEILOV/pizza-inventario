@@ -220,7 +220,7 @@ export default function AdminInsumosCRUD() {
         </div>
         <button
           onClick={abrirCreacion}
-          className="flex w-fit items-center gap-2 rounded-xl bg-orange-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-orange-800"
+          className="flex w-fit items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-hover"
         >
           <Plus className="h-4 w-4" strokeWidth={2.25} />
           Nuevo insumo
@@ -235,7 +235,7 @@ export default function AdminInsumosCRUD() {
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
             placeholder="Buscar insumo..."
-            className="w-full rounded-lg border border-stone-300 py-2 pl-9 pr-3 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
+            className="w-full rounded-lg border border-gray-300 bg-gray-50 py-2 pl-9 pr-3 text-sm text-gray-900 outline-none focus:border-brand focus:bg-white focus:ring-2 focus:ring-brand/20"
           />
         </div>
 
@@ -594,7 +594,7 @@ export default function AdminInsumosCRUD() {
               <button
                 onClick={guardar}
                 disabled={guardando}
-                className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-orange-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-800 disabled:cursor-not-allowed disabled:opacity-60"
+                className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {guardando ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -618,7 +618,7 @@ export default function AdminInsumosCRUD() {
 function inputClase(conError: boolean) {
   return [
     "w-full rounded-lg border bg-white px-3 py-2 text-sm text-stone-900 outline-none transition-colors",
-    "focus:border-orange-500 focus:ring-2 focus:ring-orange-100",
+    "focus:border-brand focus:ring-2 focus:ring-brand/20",
     conError ? "border-red-400" : "border-stone-300",
   ].join(" ");
 }
@@ -660,7 +660,7 @@ function SegmentedControl<T extends string>({
           className={[
             "flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium transition-colors",
             valor === op.valor
-              ? "bg-orange-700 text-white"
+              ? "bg-brand text-white"
               : "text-stone-500 hover:bg-stone-50",
           ].join(" ")}
         >
@@ -690,7 +690,7 @@ function FiltroPill({
           className={[
             "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
             valor === op.valor
-              ? "border-orange-700 bg-orange-700 text-white"
+              ? "border-brand bg-brand text-white"
               : "border-stone-300 text-stone-600 hover:bg-stone-50",
           ].join(" ")}
         >

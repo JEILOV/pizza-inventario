@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import {
   Settings,
   ChefHat,
@@ -9,7 +10,6 @@ import {
   Inbox,
   LogOut,
   Loader2,
-  Pizza,
   AlertTriangle,
   RefreshCw,
   ShieldQuestion,
@@ -121,8 +121,14 @@ function Hub({ usuario }: { usuario: NonNullable<ReturnType<typeof useAuth>["usu
       <header className="border-b border-stone-200 bg-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
           <div className="flex items-center gap-2">
-            <Pizza className="h-5 w-5 text-orange-700" strokeWidth={1.75} />
-            <span className="font-semibold text-stone-900">Pizza Republic</span>
+            <Image
+              src="/logo-pizza-republic.png"
+              alt="Pizza Republic"
+              width={1220}
+              height={507}
+              className="h-6 w-auto"
+              priority
+            />
             <span className="hidden text-sm text-stone-400 sm:inline">· Inventario</span>
           </div>
 
@@ -158,7 +164,7 @@ function Hub({ usuario }: { usuario: NonNullable<ReturnType<typeof useAuth>["usu
               className={[
                 "flex flex-none items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
                 vista === tab.id
-                  ? "bg-orange-700 text-white"
+                  ? "bg-brand text-white"
                   : "text-stone-500 hover:bg-stone-100",
               ].join(" ")}
             >
@@ -207,31 +213,58 @@ function PantallaLogin() {
   const { iniciarSesionConGoogle, error } = useAuth();
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-stone-50 px-4">
-      <div className="mb-8 flex flex-col items-center gap-2 text-center">
-        <Pizza className="h-8 w-8 text-orange-700" strokeWidth={1.5} />
-        <h1 className="text-xl font-semibold tracking-tight text-stone-900">
-          Pizza Republic — Inventario
-        </h1>
-        <p className="max-w-xs text-sm text-stone-500">
-          Inicia sesión con tu cuenta de Google para continuar.
-        </p>
+    <div className="flex min-h-screen flex-col bg-stone-50">
+      {/* Cuerpo centrado */}
+      <div className="flex flex-1 flex-col items-center justify-center px-4 py-12">
+        <div className="w-full max-w-sm overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
+          {/* Acento de marca — el logo trae su propio color corporativo
+              (isotipo + wordmark en #006654 sobre fondo blanco opaco),
+              así que no va sobre una franja verde: eso lo dejaría
+              invisible. Solo una línea fina como guiño de marca. */}
+          <div className="h-1.5 bg-brand" />
+
+          <div className="flex flex-col items-center gap-1 px-6 pb-2 pt-7">
+            <Image
+              src="/logo-pizza-republic.png"
+              alt="Pizza Republic"
+              width={1220}
+              height={507}
+              className="h-auto w-52"
+              priority
+            />
+            <p className="text-xs font-medium uppercase tracking-wide text-stone-400">
+              Inventario
+            </p>
+          </div>
+
+          {/* Formulario */}
+          <div className="flex flex-col gap-5 px-6 pb-7 pt-5">
+            <p className="text-center text-sm text-stone-500">
+              Inicia sesión con tu cuenta de Google para continuar.
+            </p>
+
+            <button
+              onClick={iniciarSesionConGoogle}
+              className="flex w-full items-center justify-center gap-2.5 rounded-xl bg-brand px-4 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-hover"
+            >
+              <GoogleIcon className="h-4 w-4" />
+              Continuar con Google
+            </button>
+
+            {error && (
+              <p className="flex items-center gap-1.5 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+                <AlertTriangle className="h-4 w-4 flex-none" strokeWidth={2} />
+                {error}
+              </p>
+            )}
+          </div>
+        </div>
       </div>
 
-      <button
-        onClick={iniciarSesionConGoogle}
-        className="flex w-full max-w-sm items-center justify-center gap-2.5 rounded-xl border border-stone-300 bg-white px-4 py-3 text-sm font-medium text-stone-700 shadow-sm transition-colors hover:border-orange-300 hover:bg-orange-50/40"
-      >
-        <GoogleIcon className="h-4 w-4" />
-        Continuar con Google
-      </button>
-
-      {error && (
-        <p className="mt-4 flex max-w-sm items-center gap-1.5 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
-          <AlertTriangle className="h-4 w-4 flex-none" strokeWidth={2} />
-          {error}
-        </p>
-      )}
+      {/* Footer sutil, fuera de la tarjeta */}
+      <footer className="pb-6 text-center text-xs text-stone-400">
+        Desarrollado por Jordan
+      </footer>
     </div>
   );
 }
@@ -276,7 +309,7 @@ function CuentaPendiente() {
         <button
           onClick={handleVerificar}
           disabled={verificando}
-          className="flex items-center gap-2 rounded-lg bg-orange-700 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-800 disabled:cursor-not-allowed disabled:opacity-60"
+          className="flex items-center gap-2 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
         >
           {verificando ? (
             <Loader2 className="h-4 w-4 animate-spin" />

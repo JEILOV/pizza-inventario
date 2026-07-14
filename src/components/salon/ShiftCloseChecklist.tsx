@@ -310,7 +310,7 @@ export default function ShiftCloseChecklist({
                       aria-invalid={invalido}
                       className={[
                         "w-full rounded-lg border bg-white px-3 py-2 text-sm font-medium text-stone-900 outline-none transition-colors",
-                        "focus:border-orange-500 focus:ring-2 focus:ring-orange-100",
+                        "focus:border-brand focus:ring-2 focus:ring-brand/20",
                         invalido ? "border-red-400" : alerta ? "border-amber-400" : "border-stone-300",
                       ].join(" ")}
                     />
@@ -387,7 +387,7 @@ export default function ShiftCloseChecklist({
                     onChange={(e) => actualizarNota(insumo.id, e.target.value)}
                     placeholder='Ej. "Se botaron 2 masas porque se cayeron"'
                     rows={2}
-                    className="w-full resize-none rounded-lg border border-stone-300 px-3 py-2 text-sm text-stone-700 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
+                    className="w-full resize-none rounded-lg border border-stone-300 px-3 py-2 text-sm text-stone-700 outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
                   />
                 </div>
               )}
@@ -410,7 +410,7 @@ export default function ShiftCloseChecklist({
           className={[
             "flex w-full items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-base font-semibold shadow-sm transition-colors",
             listoParaEnviar && !enviando
-              ? "bg-orange-700 text-white hover:bg-orange-800"
+              ? "bg-brand text-white hover:bg-brand-hover"
               : "cursor-not-allowed bg-stone-200 text-stone-400",
           ].join(" ")}
         >

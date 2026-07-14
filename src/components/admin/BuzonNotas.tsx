@@ -121,7 +121,7 @@ export default function BuzonNotas() {
               className={[
                 "rounded-md px-3 py-1.5 text-xs font-medium capitalize transition-colors",
                 filtroZona === valor
-                  ? "bg-orange-700 text-white"
+                  ? "bg-brand text-white"
                   : "text-stone-500 hover:bg-stone-50",
               ].join(" ")}
             >

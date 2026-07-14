@@ -12,6 +12,18 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/*
+ * Identidad corporativa — Pizza Republic (Manual de Identidad, sec. 7).
+ * Van en su propio bloque @theme (no "inline") porque son valores fijos,
+ * no dependen de --background/--foreground ni cambian con el modo
+ * oscuro del sistema. Habilita bg-brand, text-brand, border-brand,
+ * ring-brand, etc.
+ */
+@theme {
+  --color-brand: #006654;
+  --color-brand-hover: #004c3f;
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
