@@ -1,0 +1,116 @@
+rules_version = '2';
+
+// ─────────────────────────────────────────────────────────────
+// Pizza Republic — Inventario
+// El Custom Claim `rol` ("admin" | "cocina" | "salon") vive en el ID
+// token y se sincroniza desde usuarios/{uid} vía la Cloud Function
+// `sincronizarRolClaim` (onDocumentWritten, functions/index.js).
+//
+// Nota de diseño: `rol` ("cocina"/"salon") y `zona` en los documentos
+// de insumos/cierres/ajustes usan exactamente los mismos strings a
+// propósito — así una sola función (`esDeZona`) sirve para comparar
+// "¿este usuario pertenece a la zona de este documento?" sin tener
+// que mantener un mapeo rol→zona aparte.
+// ─────────────────────────────────────────────────────────────
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- Helpers ----------
+
+    function estaAutenticado() {
+      return request.auth != null;
+    }
+
+    function rol() {
+      return request.auth.token.rol;
+    }
+
+    function esAdmin() {
+      return estaAutenticado() && rol() == 'admin';
+    }
+
+    // true si el usuario logueado pertenece a la zona indicada
+    // (cocina/salon) — no aplica a admin, que se valida aparte.
+    function esDeZona(zona) {
+      return estaAutenticado() && rol() == zona;
+    }
+
+    // ---------- usuarios ----------
+    // Solo el admin lee y escribe el padrón de empleados y sus roles.
+    // Escribir acá es lo que dispara (vía Cloud Function) la
+    // actualización del Custom Claim de cada persona.
+    match /usuarios/{uid} {
+      allow read, write: if esAdmin();
+    }
+
+    // ---------- insumos ----------
+    match /insumos/{insumoId} {
+      // Cualquier persona autenticada puede leer el catálogo completo
+      // — los dashboards de zona filtran client-side; no es
+      // información sensible y negar la lectura cruzada no aporta
+      // seguridad real, solo complicaría los hooks existentes.
+      allow read: if estaAutenticado();
+
+      // Alta, baja y cualquier cambio estructural (nombre, mínimos,
+      // zona, tipo, etc.) — exclusivo del admin. Cocina/Salón NUNCA
+      // crean ni borran insumos.
+      allow create, delete: if esAdmin();
+
+      // Cocina/Salón SOLO pueden ajustar el stock de insumos de su
+      // propia zona, y SOLO esos dos campos. `diff().affectedKeys()`
+      // rechaza cualquier intento de tocar stockMinimo, nombre, zona,
+      // etc. por esta vía — eso sigue siendo terreno exclusivo del
+      // admin.
+      allow update: if esAdmin()
+        || (
+          esDeZona(resource.data.zona)
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['stockActual', 'actualizadoEn'])
+          && request.resource.data.stockActual is number
+          && request.resource.data.stockActual >= 0
+        );
+    }
+
+    // ---------- cierres ----------
+    match /cierres/{cierreId} {
+      // Admin ve todo. Cocina/Salón solo ven el historial de SU zona
+      // (lo necesita ZoneDashboard para "último cierre hace X").
+      allow read: if esAdmin() || esDeZona(resource.data.zona);
+
+      // Alta limitada a la propia zona, y el `usuarioId` del
+      // documento tiene que ser el uid real de quien está autenticado
+      // (nadie puede registrar un cierre a nombre de otra persona).
+      allow create: if esAdmin()
+        || (
+          esDeZona(request.resource.data.zona)
+          && request.resource.data.usuarioId == request.auth.uid
+        );
+
+      // Un cierre ya confirmado es un registro histórico — nadie
+      // fuera del admin lo edita ni lo borra.
+      allow update, delete: if esAdmin();
+    }
+
+    // ---------- ajustes ----------
+    match /ajustes/{ajusteId} {
+      // Misma lógica que cierres: cocina/salon leen y crean solo lo
+      // de su propia zona (necesario, por ejemplo, para un futuro
+      // historial de ajustes en el dashboard de zona); edición y
+      // borrado exclusivos del admin.
+      allow read: if esAdmin() || esDeZona(resource.data.zona);
+
+      allow create: if esAdmin()
+        || (
+          esDeZona(request.resource.data.zona)
+          && request.resource.data.usuarioId == request.auth.uid
+        );
+
+      allow update, delete: if esAdmin();
+    }
+
+    // Cualquier otra colección no contemplada: denegada por defecto
+    // (comportamiento implícito de Firestore Rules — no hace falta
+    // una regla explícita, se deja este comentario como constancia).
+  }
+}

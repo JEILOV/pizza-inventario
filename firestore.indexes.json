@@ -1,0 +1,24 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "cierres",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "zona",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "fechaHora",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    }
+  ],
+  "fieldOverrides": []
+}
