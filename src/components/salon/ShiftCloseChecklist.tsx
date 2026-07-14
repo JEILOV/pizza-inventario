@@ -43,6 +43,16 @@ function esDiferenciaGrande(stockActual: number, delta: number) {
   return Math.abs(delta) / stockActual >= UMBRAL_ALERTA_PORCENTAJE;
 }
 
+// Validación estricta del conteo: no vacío, no NaN, no negativo.
+// "12.5.3" o "abc" también deben quedar fuera — Number() es permisivo
+// con espacios pero no con texto no numérico, así que Number.isNaN
+// cubre el caso general.
+function esConteoValido(valor: string): boolean {
+  if (valor.trim() === "") return false;
+  const n = Number(valor);
+  return !Number.isNaN(n) && n >= 0;
+}
+
 // Heurística simple mientras no haya turnos configurados en el backend —
 // reemplazar cuando exista un selector de turno real o venga del roster.
 function getTurnoActual(): string {
@@ -71,6 +81,15 @@ export default function ShiftCloseChecklist({
   const [enviando, setEnviando] = useState(false);
   const [enviado, setEnviado] = useState(false);
   const [errorEnvio, setErrorEnvio] = useState<string | null>(null);
+
+  // Única fuente de lectura de `items`. Cubre la ventana de la condición
+  // de carrera: el useEffect de abajo llena `items` después del commit,
+  // así que en cualquier render entre "insumos ya llegó" y "el efecto ya
+  // corrió", esto evita leer undefined. No es un parche temporal — es
+  // la segunda mitad necesaria de sincronizar estado externo (Firestore)
+  // hacia estado local de formulario.
+  const getItem = (id: string): ItemCierre =>
+    items[id] ?? { nuevoConteo: "", nota: "", notaAbierta: false };
 
   // Cuando llegan (o cambian) los insumos desde Firestore, inicializa una
   // entrada por cada uno — pero solo si todavía no existe. Así, si el
@@ -113,7 +132,7 @@ export default function ShiftCloseChecklist({
   };
 
   const conteosCompletados = useMemo(
-    () => insumos.filter((i) => items[i.id]?.nuevoConteo.trim() !== "").length,
+    () => insumos.filter((i) => esConteoValido(getItem(i.id).nuevoConteo)).length,
     [insumos, items]
   );
 
@@ -130,7 +149,7 @@ export default function ShiftCloseChecklist({
         turno: turno ?? getTurnoActual(),
         usuarioId,
         items: insumos.map((insumo) => {
-          const item = items[insumo.id];
+          const item = getItem(insumo.id);
           const nuevo = Number(item.nuevoConteo);
           return {
             insumoId: insumo.id,
@@ -201,7 +220,7 @@ export default function ShiftCloseChecklist({
           <ClipboardList className="h-6 w-6 text-orange-700" strokeWidth={1.75} />
           <div>
             <h1 className="text-xl font-semibold tracking-tight text-stone-900">
-              Cierre de turno — Cocina
+              Cierre de turno — {zona === "cocina" ? "Cocina" : "Salón"}
             </h1>
             <p className="text-sm text-stone-500">
               Cuenta el stock físico de cada insumo y confirma al terminar.
@@ -225,22 +244,22 @@ export default function ShiftCloseChecklist({
       {/* Lista de insumos */}
       <ul className="flex flex-col gap-3">
         {insumos.map((insumo) => {
-          // Fallback defensivo: en el primer render tras recibir insumos
-          // nuevos de Firestore, el useEffect que inicializa `items`
-          // todavía no corrió (los efectos se ejecutan después del
-          // commit). Sin este fallback, item queda undefined por un
-          // instante y truena al leer item.nuevoConteo — es justo el
-          // TypeError que viste en consola.
-          const item = items[insumo.id] ?? { nuevoConteo: "", nota: "", notaAbierta: false };
+          const item = getItem(insumo.id);
           const delta = calcularDelta(insumo.stockActual, item.nuevoConteo);
           const alerta = delta !== null && esDiferenciaGrande(insumo.stockActual, delta);
+          const tieneTexto = item.nuevoConteo.trim() !== "";
+          const invalido = tieneTexto && !esConteoValido(item.nuevoConteo);
 
           return (
             <li
               key={insumo.id}
               className={[
                 "rounded-xl border bg-white p-4 shadow-sm transition-colors",
-                alerta ? "border-amber-300 bg-amber-50/40" : "border-stone-200",
+                invalido
+                  ? "border-red-300 bg-red-50/40"
+                  : alerta
+                  ? "border-amber-300 bg-amber-50/40"
+                  : "border-stone-200",
               ].join(" ")}
             >
               {/* Fila principal: card en móvil, grid de "tabla" en desktop */}
@@ -284,24 +303,36 @@ export default function ShiftCloseChecklist({
                       id={`conteo-${insumo.id}`}
                       type="number"
                       inputMode="decimal"
+                      min={0}
                       placeholder="0"
                       value={item.nuevoConteo}
                       onChange={(e) => actualizarConteo(insumo.id, e.target.value)}
+                      aria-invalid={invalido}
                       className={[
                         "w-full rounded-lg border bg-white px-3 py-2 text-sm font-medium text-stone-900 outline-none transition-colors",
                         "focus:border-orange-500 focus:ring-2 focus:ring-orange-100",
-                        alerta ? "border-amber-400" : "border-stone-300",
+                        invalido ? "border-red-400" : alerta ? "border-amber-400" : "border-stone-300",
                       ].join(" ")}
                     />
                     <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-stone-400">
                       {insumo.unidad}
                     </span>
+                    {invalido && (
+                      <p className="mt-1 text-xs font-medium text-red-600">
+                        Ingresa un número válido (0 o mayor)
+                      </p>
+                    )}
                   </div>
                 </div>
 
                 {/* Delta */}
                 <div className="flex items-center gap-1.5">
-                  {delta === null ? (
+                  {invalido ? (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-red-50 px-2 py-1 text-xs font-semibold text-red-600">
+                      <AlertTriangle className="h-3.5 w-3.5" strokeWidth={2} />
+                      Inválido
+                    </span>
+                  ) : delta === null ? (
                     <span className="text-sm text-stone-300">—</span>
                   ) : (
                     <span
@@ -318,7 +349,7 @@ export default function ShiftCloseChecklist({
                       {delta}
                     </span>
                   )}
-                  {alerta && (
+                  {!invalido && alerta && (
                     <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-600">
                       <AlertTriangle className="h-3.5 w-3.5" strokeWidth={2} />
                       <span className="hidden sm:inline">Revisar</span>
@@ -367,6 +398,12 @@ export default function ShiftCloseChecklist({
 
       {/* Acción principal */}
       <div className="sticky bottom-0 mt-6 -mx-4 border-t border-stone-200 bg-white/95 px-4 py-4 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+        {errorEnvio && (
+          <p className="mb-3 flex items-center gap-1.5 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+            <AlertTriangle className="h-4 w-4 flex-none" strokeWidth={2} />
+            {errorEnvio}
+          </p>
+        )}
         <button
           onClick={handleConfirmar}
           disabled={!listoParaEnviar || enviando}
