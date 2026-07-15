@@ -4,6 +4,8 @@ import {
   orderBy,
   limit,
   onSnapshot,
+  doc,
+  writeBatch,
   type FirestoreError,
   type Unsubscribe,
 } from "firebase/firestore";
@@ -30,6 +32,10 @@ export interface EventoAjuste {
   cantidad: number;
   tipoAjuste: TipoAjuste;
   motivo: string;
+  /** true si el evento fue archivado desde el Buzón (ver `limpiarBuzon`
+   *  más abajo). El documento original en Firestore sigue existiendo
+   *  intacto — esto solo controla si el Buzón lo muestra o no. */
+  archivado: boolean;
 }
 
 export interface NotaCierreItem {
@@ -46,6 +52,10 @@ export interface EventoCierre {
   turno: string;
   notaGeneral: string | null;
   notasDeItems: NotaCierreItem[];
+  /** Igual que en `EventoAjuste`: solo afecta la visibilidad en el
+   *  Buzón, no el documento de `cierres` en sí (que sigue contando
+   *  para `obtenerUltimoCierre`, por ejemplo). */
+  archivado: boolean;
 }
 
 export type EventoBuzon = EventoAjuste | EventoCierre;
@@ -95,6 +105,7 @@ export function subscribeAjustesRecientes(
           cantidad: data.cantidad as number,
           tipoAjuste: data.tipo as TipoAjuste,
           motivo: (data.motivo as string) ?? "",
+          archivado: data.archivado === true,
         };
       });
       onData(eventos);
@@ -154,6 +165,7 @@ export function subscribeCierresConNotas(
           turno: (data.turno as string) ?? "",
           notaGeneral,
           notasDeItems,
+          archivado: data.archivado === true,
         });
       }
 
@@ -164,4 +176,44 @@ export function subscribeCierresConNotas(
       onError?.(error);
     }
   );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Limpiar el Buzón — archiva los documentos de origen (soft delete),
+// no los borra. Ver `limpiarBuzon` más abajo para el detalle.
+// ─────────────────────────────────────────────────────────────
+
+// A qué colección de Firestore pertenece cada tipo de evento del buzón.
+const COLECCION_POR_ORIGEN: Record<EventoBuzon["origen"], string> = {
+  ajuste: "ajustes",
+  cierre: "cierres",
+};
+
+// Lo mínimo que se necesita para archivar un evento: su id y de qué
+// colección viene. Se acepta esta forma reducida (en vez de pedir el
+// `EventoBuzon` completo) para que el llamador pueda pasar directamente
+// `eventos` o `eventosFiltrados` tal cual vienen del hook.
+export type ReferenciaEventoBuzon = Pick<EventoBuzon, "id" | "origen">;
+
+/**
+ * "Archiva" los eventos indicados: NO borra ningún documento de
+ * Firestore, solo escribe `archivado: true` sobre cada uno. El
+ * historial de ajustes y de cierres de turno de la pizzería queda
+ * intacto para siempre — lo único que cambia es que `useBuzonNotas`
+ * deja de mostrarlos en el Buzón (ver el filtro en ese hook).
+ *
+ * Se sigue usando un solo `writeBatch` (hasta 500 operaciones, de
+ * sobra para "pocas notas") en vez de `Promise.all(updateDoc...)`:
+ * mismo costo en lecturas/escrituras del plan Spark, pero atómico — o
+ * se archivan todos los documentos, o ninguno.
+ */
+export async function limpiarBuzon(eventos: ReferenciaEventoBuzon[]): Promise<void> {
+  if (eventos.length === 0) return;
+
+  const batch = writeBatch(db);
+  for (const evento of eventos) {
+    const coleccion = COLECCION_POR_ORIGEN[evento.origen];
+    batch.update(doc(db, coleccion, evento.id), { archivado: true });
+  }
+  await batch.commit();
 }

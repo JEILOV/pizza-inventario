@@ -12,6 +12,7 @@ import {
   Plus,
   ChefHat,
   Store,
+  Trash2,
 } from "lucide-react";
 import { useBuzonNotas } from "@/hooks/useBuzonNotas";
 import { useInsumos } from "@/hooks/useInsumos";
@@ -107,7 +108,7 @@ type FiltroZona = "todas" | Zona;
 // ─────────────────────────────────────────────────────────────
 
 export default function BuzonNotas() {
-  const { eventos, nombresUsuarios, cargando, error } = useBuzonNotas();
+  const { eventos, nombresUsuarios, cargando, error, limpiando, limpiarBuzon } = useBuzonNotas();
   const { insumos } = useInsumos();
   const [filtroZona, setFiltroZona] = useState<FiltroZona>("todas");
 
@@ -120,6 +121,18 @@ export default function BuzonNotas() {
     if (filtroZona === "todas") return eventos;
     return eventos.filter((e) => e.zona === filtroZona);
   }, [eventos, filtroZona]);
+
+  // Limpia justo lo que se está viendo (respeta el filtro de zona
+  // activo): si el admin filtró a "Cocina" y limpia, solo se borran las
+  // notas de Cocina, no las de Salón que en ese momento están ocultas.
+  async function handleLimpiarBuzon() {
+    if (eventosFiltrados.length === 0) return;
+    const confirmado = window.confirm(
+      "¿Estás seguro de eliminar todas las notas de este buzón? Esta acción no se puede deshacer."
+    );
+    if (!confirmado) return;
+    await limpiarBuzon(eventosFiltrados);
+  }
 
   const ahora = new Date();
 
@@ -175,6 +188,24 @@ export default function BuzonNotas() {
           ))}
         </div>
       </div>
+
+      {/* Acción: limpiar lo que se está viendo actualmente */}
+      {eventosFiltrados.length > 0 && (
+        <div className="mb-4 flex justify-end">
+          <button
+            onClick={handleLimpiarBuzon}
+            disabled={limpiando}
+            className="flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {limpiando ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2} />
+            ) : (
+              <Trash2 className="h-3.5 w-3.5" strokeWidth={2} />
+            )}
+            {limpiando ? "Limpiando..." : "Limpiar buzón"}
+          </button>
+        </div>
+      )}
 
       {/* Timeline */}
       {eventosFiltrados.length === 0 ? (
