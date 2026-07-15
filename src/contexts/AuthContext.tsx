@@ -10,7 +10,8 @@ import {
 } from "react";
 import {
   onAuthStateChanged,
-  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signOut,
   type User as FirebaseUser,
 } from "firebase/auth";
@@ -88,6 +89,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   useEffect(() => {
+    let cancelado = false;
+
+    // Recoge el resultado de un signInWithRedirect que recién volvió de
+    // Google (navegación completa, no popup — ver `iniciarSesionConGoogle`
+    // más abajo para el porqué). Se corre en paralelo al listener de
+    // abajo: `onAuthStateChanged` es la fuente de verdad para apagar
+    // `cargando`, esto solo hace el refresh forzado del token cuando
+    // corresponde (mismo caso que antes: el admin pudo haber creado el
+    // rol segundos antes de este primer login).
+    getRedirectResult(auth)
+      .then(async (resultado) => {
+        if (cancelado || !resultado?.user) return;
+        try {
+          await sincronizarDesdeFirebaseUser(resultado.user, true);
+        } catch (e) {
+          console.error("Error al leer los permisos tras el login con Google:", e);
+        }
+      })
+      .catch((e) => {
+        if (cancelado) return;
+        console.error("Error al completar el login con Google:", e);
+        setError("No se pudo completar el inicio de sesión con Google. Intenta de nuevo.");
+      });
+
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
       setError(null);
 
@@ -99,8 +124,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       try {
-        // No forzamos refresh en el listener normal — solo al iniciar
-        // sesión recién (más abajo) y en `recargarPermisos` explícito.
+        // No forzamos refresh en el listener normal — el refresh forzado
+        // de un login recién hecho lo maneja `getRedirectResult` arriba.
         await sincronizarDesdeFirebaseUser(fbUser, false);
       } catch (e) {
         console.error("Error al leer los permisos de la cuenta:", e);
@@ -112,23 +137,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      cancelado = true;
+      unsubscribe();
+    };
   }, [sincronizarDesdeFirebaseUser]);
 
   const iniciarSesionConGoogle = useCallback(async () => {
     setError(null);
     try {
-      const credencial = await signInWithPopup(auth, googleProvider);
-      // Forzamos refresh aquí: si es la primera vez que esta persona
-      // entra, el admin pudo haber creado su `usuarios/{uid}` apenas
-      // segundos antes, y el token que Firebase entrega en el propio
-      // signInWithPopup podría no traer el claim todavía.
-      await sincronizarDesdeFirebaseUser(credencial.user, true);
+      // signInWithRedirect en vez de signInWithPopup: en navegadores
+      // móviles el popup es poco confiable (bloqueo de terceros,
+      // storage partitioning, el propio bloqueador de pop-ups) y deja
+      // la sesión a medio resolver — el resultado es justamente una
+      // pantalla en blanco/rota justo después de tocar "Continuar con
+      // Google", que a veces "aparece" recién tras varios refresh.
+      // El redirect es una navegación completa, sin esa fragilidad.
+      // El resultado se procesa en el useEffect de arriba, con
+      // getRedirectResult, al volver de Google.
+      await signInWithRedirect(auth, googleProvider);
     } catch (e) {
       console.error("Error al iniciar sesión con Google:", e);
       setError("No se pudo iniciar sesión con Google. Intenta de nuevo.");
     }
-  }, [sincronizarDesdeFirebaseUser]);
+  }, []);
 
   const cerrarSesion = useCallback(async () => {
     setError(null);
