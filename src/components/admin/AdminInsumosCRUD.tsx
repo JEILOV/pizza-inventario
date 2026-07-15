@@ -18,7 +18,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { useInsumos } from "@/hooks/useInsumos";
-import AlertasCompra from "@/components/admin/AlertasCompra";
+import AlertasCompra from "@/components/shared/AlertasCompra";
 import type { Zona, TipoInsumo, Insumo } from "@/types/insumo";
 
 // Estado editable del formulario — todo como string para inputs controlados,
@@ -228,8 +228,18 @@ export default function AdminInsumosCRUD() {
         </button>
       </div>
 
-      {/* Alertas de compra — solo se renderiza si hay algo por debajo del mínimo */}
-      <AlertasCompra insumos={insumos} />
+      {/* Alertas de preparación — el Admin gestiona al personal, así que
+          ve los insumos INTERNOS (masas, salsas: se preparan en el
+          local) bajo mínimo, para recordarle al equipo que los produzca.
+          Los externos (se compran hechos) los reporta el propio
+          personal desde su Dashboard de zona, no se duplican aquí. */}
+      <AlertasCompra
+        insumos={insumos}
+        tipo="interno"
+        titulo="Alertas de preparación"
+        subtitulo="Insumos internos en cero o por debajo del mínimo. Conviene recordarle al equipo que los prepare."
+        textoBoton="Enviar recordatorio de preparación al equipo"
+      />
 
       {/* Filtros */}
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

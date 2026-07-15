@@ -21,6 +21,7 @@ import {
   getStockMinimoVigente,
 } from "@/lib/reglasInventario";
 import AjusteRapidoModal from "@/components/shared/AjusteRapidoModal";
+import AlertasCompra from "@/components/shared/AlertasCompra";
 import type { Insumo, Zona } from "@/types/insumo";
 
 // ─────────────────────────────────────────────────────────────
@@ -164,6 +165,19 @@ export default function ZoneDashboard({
           </button>
         </div>
       </div>
+
+      {/* Alertas de compra — Cocina/Salón son quienes detectan que falta
+          algo del día a día, así que avisan a Gerencia. Solo ven los
+          insumos EXTERNOS (se compran hechos) bajo mínimo; los internos
+          (masas, salsas) son responsabilidad de que el propio equipo
+          los prepare, y esos los recuerda el Admin desde su panel. */}
+      <AlertasCompra
+        insumos={insumos}
+        tipo="externo"
+        titulo="Alertas de compra"
+        subtitulo="Insumos externos en cero o por debajo del mínimo. Conviene avisarle a Gerencia cuanto antes."
+        textoBoton="Pedir insumos externos a Gerencia"
+      />
 
       {/* Sección: Por reponer ahora (rojo) */}
       <Section
