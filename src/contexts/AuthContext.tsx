@@ -1,50 +1,28 @@
 "use client";
 
-
-
 import {
-
   createContext,
-
   useContext,
-
   useEffect,
-
+  useRef,
   useState,
-
   useCallback,
-
   type ReactNode,
-
 } from "react";
-
 import {
-
   onAuthStateChanged,
-
-  signInWithRedirect,
-
-  getRedirectResult,
-
+  signInWithPopup,
   signOut,
-
   type User as FirebaseUser,
-
 } from "firebase/auth";
-
 import { auth, googleProvider } from "@/lib/firebase";
-
 import type { RolUsuario, Usuario } from "@/types/usuario";
-
-
 
 // ─────────────────────────────────────────────────────────────
 
 // Tipos
 
 // ─────────────────────────────────────────────────────────────
-
-
 
 interface AuthContextValue {
 
@@ -86,11 +64,7 @@ interface AuthContextValue {
 
 }
 
-
-
 const AuthContext = createContext<AuthContextValue | null>(null);
-
-
 
 // Roles válidos — cualquier otro valor en el claim (typo, rol viejo,
 
@@ -98,23 +72,17 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 const ROLES_VALIDOS: readonly RolUsuario[] = ["admin", "cocina", "salon"];
 
-
-
 function esRolValido(valor: unknown): valor is RolUsuario {
 
   return typeof valor === "string" && (ROLES_VALIDOS as readonly string[]).includes(valor);
 
 }
 
-
-
 // ─────────────────────────────────────────────────────────────
 
 // Provider
 
 // ─────────────────────────────────────────────────────────────
-
-
 
 export function AuthProvider({ children }: { children: ReactNode }) {
 
@@ -125,8 +93,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [cuentaPendiente, setCuentaPendiente] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
-
-
 
   // Lee el ID token (forzando refresh o no) de un usuario de Firebase
 
@@ -142,8 +108,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const rolClaim = token.claims.rol;
 
-
-
       if (!esRolValido(rolClaim)) {
 
         // Autenticado en Firebase, pero sin rol asignado todavía.
@@ -155,8 +119,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
 
       }
-
-
 
       setUsuario({
 
@@ -176,155 +138,113 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   );
 
-
+  // Guarda de montaje: en móviles con poca RAM, un hard refresh puede
+  // desmontar este provider mientras `getIdTokenResult` todavía está en
+  // vuelo (la pestaña se descarta y se recrea a medio camino). Sin esta
+  // guarda, el `then`/`catch` de esa promesa llega tarde y llama a
+  // `setState` sobre un componente ya desmontado — eso por sí solo no
+  // "revienta" la pestaña, pero sí es la clase de callback colgado que,
+  // sumado a un listener de Firebase que se re-suscribe en cada render,
+  // termina en el bucle de renders que sí la revienta. Aquí cortamos esa
+  // cadena en la raíz: nunca tocamos el estado si ya nos desmontamos.
+  const montadoRef = useRef(true);
 
   useEffect(() => {
+    montadoRef.current = true;
 
-    let cancelado = false;
-
-
-
-    // Recoge el resultado de un signInWithRedirect que recién volvió de
-
-    // Google (navegación completa, no popup — ver `iniciarSesionConGoogle`
-
-    // más abajo para el porqué). Se corre en paralelo al listener de
-
-    // abajo: `onAuthStateChanged` es la fuente de verdad para apagar
-
-    // `cargando`, esto solo hace el refresh forzado del token cuando
-
-    // corresponde (mismo caso que antes: el admin pudo haber creado el
-
-    // rol segundos antes de este primer login).
-
-    getRedirectResult(auth)
-
-      .then(async (resultado) => {
-
-        if (cancelado || !resultado?.user) return;
-
-        try {
-
-          await sincronizarDesdeFirebaseUser(resultado.user, true);
-
-        } catch (e) {
-
-          console.error("Error al leer los permisos tras el login con Google:", e);
-
-        }
-
-      })
-
-      .catch((e) => {
-
-        if (cancelado) return;
-
-        console.error("Error al completar el login con Google:", e);
-
-        setError("No se pudo completar el inicio de sesión con Google. Intenta de nuevo.");
-
-      });
-
-
-
-    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+    // onAuthStateChanged se suscribe UNA sola vez por montaje del
+    // provider: el array de dependencias es [] (no
+    // `[sincronizarDesdeFirebaseUser]`) para que ni siquiera un cambio de
+    // identidad de esa función (que en teoría no debería ocurrir, al
+    // estar memoizada con `useCallback(..., [])`, pero que sí puede
+    // ocurrir en desarrollo con Fast Refresh) dispare una nueva
+    // suscripción. Una nueva suscripción en cada render es exactamente
+    // el patrón que produce el "Aw, Snap!" en dispositivos con poca RAM:
+    // cada listener viejo queda vivo hasta que se desmonta, y si el
+    // desmontaje no llega a tiempo (hard refresh a medio hidratar), se
+    // acumulan listeners y callbacks async pendientes hasta agotar la
+    // memoria de la pestaña.
+    const unsubscribe = onAuthStateChanged(auth, (fbUser) => {
+      if (!montadoRef.current) return;
 
       setError(null);
 
-
-
       if (!fbUser) {
-
         setUsuario(null);
-
         setCuentaPendiente(false);
-
         setCargando(false);
-
         return;
-
       }
 
-
-
-      try {
-
-        // No forzamos refresh en el listener normal — el refresh forzado
-
-        // de un login recién hecho lo maneja `getRedirectResult` arriba.
-
-        await sincronizarDesdeFirebaseUser(fbUser, false);
-
-      } catch (e) {
-
-        console.error("Error al leer los permisos de la cuenta:", e);
-
-        setError("No se pudo verificar tu cuenta. Intenta de nuevo.");
-
-        setUsuario(null);
-
-        setCuentaPendiente(false);
-
-      } finally {
-
-        setCargando(false);
-
-      }
-
+      // La lectura de claims es async y separada del propio callback de
+      // onAuthStateChanged a propósito: así el callback termina de
+      // ejecutarse de inmediato (no queda una promesa "colgando" dentro
+      // del listener de Firebase) y la única responsabilidad async que
+      // sobrevive es esta, protegida por `montadoRef`.
+      sincronizarDesdeFirebaseUser(fbUser, false)
+        .catch((e) => {
+          if (!montadoRef.current) return;
+          console.error("Error al leer los permisos de la cuenta:", e);
+          setError("No se pudo verificar tu cuenta. Intenta de nuevo.");
+          setUsuario(null);
+          setCuentaPendiente(false);
+        })
+        .finally(() => {
+          if (!montadoRef.current) return;
+          setCargando(false);
+        });
     });
 
-
-
     return () => {
-
-      cancelado = true;
-
+      montadoRef.current = false;
       unsubscribe();
-
     };
-
-  }, [sincronizarDesdeFirebaseUser]);
-
-
-
-  const iniciarSesionConGoogle = useCallback(async () => {
-
-    setError(null);
-
-    try {
-
-      // signInWithRedirect en vez de signInWithPopup: en navegadores
-
-      // móviles el popup es poco confiable (bloqueo de terceros,
-
-      // storage partitioning, el propio bloqueador de pop-ups) y deja
-
-      // la sesión a medio resolver — el resultado es justamente una
-
-      // pantalla en blanco/rota justo después de tocar "Continuar con
-
-      // Google", que a veces "aparece" recién tras varios refresh.
-
-      // El redirect es una navegación completa, sin esa fragilidad.
-
-      // El resultado se procesa en el useEffect de arriba, con
-
-      // getRedirectResult, al volver de Google.
-
-      await signInWithRedirect(auth, googleProvider);
-
-    } catch (e) {
-
-      console.error("Error al iniciar sesión con Google:", e);
-
-      setError("No se pudo iniciar sesión con Google. Intenta de nuevo.");
-
-    }
-
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-
+  const iniciarSesionConGoogle = useCallback(async () => {
+    setError(null);
+    try {
+      // Volvemos a signInWithPopup a propósito. El redirect fallaba en
+      // móvil porque, al volver de accounts.google.com, el navegador
+      // trata la cookie de sesión de Firebase (en el dominio de
+      // Firebase/Google) como cookie de terceros respecto del dominio de
+      // Vercel — Safari (ITP) y Chrome en modo incógnito/Android la
+      // bloquean por defecto. Sin esa cookie, `getRedirectResult` nunca
+      // encuentra el resultado pendiente y el usuario vuelve a caer en
+      // el login: un rebote infinito. El popup evita el problema porque
+      // toda la negociación con Google ocurre en una ventana/contexto
+      // aparte que sí puede leer sus propias cookies de primera parte;
+      // el resultado vuelve directo a esta promesa, sin depender de
+      // cookies cruzadas ni de un segundo ciclo de carga de la página.
+      const resultado = await signInWithPopup(auth, googleProvider);
+      // No hace falta llamar a sincronizarDesdeFirebaseUser aquí: el
+      // propio signInWithPopup dispara onAuthStateChanged, que ya se
+      // encarga de leer los claims. Forzamos igual un refresh del token
+      // (sin tocar el estado) por si el admin asignó el rol segundos
+      // antes de este login y el token recién emitido todavía no lo
+      // trae — así el listener de arriba, que corre justo después, ya
+      // ve el claim actualizado en vez de tener que esperar otra ronda.
+      if (resultado?.user) {
+        await resultado.user.getIdToken(true);
+      }
+    } catch (e) {
+      console.error("Error al iniciar sesión con Google:", e);
+      const codigo = (e as { code?: string })?.code;
+      if (codigo === "auth/popup-closed-by-user" || codigo === "auth/cancelled-popup-request") {
+        // El usuario cerró el popup o lo canceló a propósito — no es un
+        // error real del sistema, no mostramos mensaje de error.
+        return;
+      }
+      if (codigo === "auth/popup-blocked") {
+        setError(
+          "Tu navegador bloqueó la ventana de Google. Habilita las ventanas emergentes para este sitio e intenta de nuevo."
+        );
+        return;
+      }
+      setError("No se pudo iniciar sesión con Google. Intenta de nuevo.");
+    }
+  }, []);
 
   const cerrarSesion = useCallback(async () => {
 
@@ -343,8 +263,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
   }, []);
-
-
 
   const recargarPermisos = useCallback(async () => {
 
@@ -365,8 +283,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
   }, [sincronizarDesdeFirebaseUser]);
-
-
 
   return (
 
@@ -400,15 +316,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 }
 
-
-
 // ─────────────────────────────────────────────────────────────
 
 // Hook de consumo
 
 // ─────────────────────────────────────────────────────────────
-
-
 
 export function useAuth(): AuthContextValue {
 
@@ -422,5 +334,4 @@ export function useAuth(): AuthContextValue {
 
   return ctx;
 
-} 
-
+}
