@@ -59,6 +59,10 @@ export async function confirmarCierreTurno(input: CierreInput): Promise<string> 
       diferencia: item.diferencia,
       nota: item.nota?.trim() || null,
     })),
+    // Igual que en ajustesService: sin esto, where("archivado", "==",
+    // false) en subscribeCierresConNotas excluiría este documento por
+    // no tener el campo, no por tenerlo en true.
+    archivado: false,
   });
 
   for (const item of input.items) {

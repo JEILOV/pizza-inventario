@@ -14,26 +14,15 @@ import {
   RefreshCw,
   ShieldQuestion,
 } from "lucide-react";
-import AdminInsumosCRUD from "@/components/admin/AdminInsumosCRUD";
-import BuzonNotas from "@/components/admin/BuzonNotas";
-import KitchenDashboard from "@/components/cocina/KitchenDashboard";
-import SalonDashboard from "@/components/salon/SalonDashboard";
-import ShiftCloseChecklist from "@/components/salon/ShiftCloseChecklist";
+import ControlPanel from "@/components/hub/ControlPanel";
 import { useAuth } from "@/contexts/AuthContext";
 import type { RolUsuario } from "@/types/usuario";
+import type { VistaId } from "@/components/hub/tipos";
 
 // ─────────────────────────────────────────────────────────────
-// Vistas disponibles dentro del Hub. Los ids son únicos entre roles
-// para que el switch de abajo no tenga ambigüedad.
+// Configuración de pestañas del Hub por rol. Los ids son únicos entre
+// roles para que ControlPanel no tenga ambigüedad.
 // ─────────────────────────────────────────────────────────────
-
-type VistaId =
-  | "insumos"
-  | "cocina-dashboard"
-  | "cocina-cierre"
-  | "salon-dashboard"
-  | "salon-cierre"
-  | "notas";
 
 interface TabConfig {
   id: VistaId;
@@ -177,29 +166,12 @@ function Hub({ usuario }: { usuario: NonNullable<ReturnType<typeof useAuth>["usu
 
       {/* Cuerpo */}
       <main className="py-8">
-        {vista === "insumos" && <AdminInsumosCRUD />}
-
-        {vista === "cocina-dashboard" && (
-          <KitchenDashboard
-            usuarioId={usuario.uid}
-            onIrAlChecklist={() => setVista("cocina-cierre")}
-          />
-        )}
-        {vista === "cocina-cierre" && (
-          <ShiftCloseChecklist zona="cocina" usuarioId={usuario.uid} />
-        )}
-
-        {vista === "salon-dashboard" && (
-          <SalonDashboard
-            usuarioId={usuario.uid}
-            onIrAlChecklist={() => setVista("salon-cierre")}
-          />
-        )}
-        {vista === "salon-cierre" && (
-          <ShiftCloseChecklist zona="salon" usuarioId={usuario.uid} />
-        )}
-
-        {vista === "notas" && <BuzonNotas />}
+        <ControlPanel
+          vista={vista}
+          usuarioId={usuario.uid}
+          onIrACierreCocina={() => setVista("cocina-cierre")}
+          onIrACierreSalon={() => setVista("salon-cierre")}
+        />
       </main>
     </div>
   );

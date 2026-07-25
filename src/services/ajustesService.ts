@@ -69,6 +69,10 @@ export async function registrarAjusteRapido(input: AjusteInput): Promise<void> {
       stockNuevo,
       usuarioId: input.usuarioId,
       fechaHora: serverTimestamp(),
+      // Necesario para que `where("archivado", "==", false)` en
+      // subscribeAjustesRecientes lo matchee — Firestore no incluye
+      // documentos donde el campo simplemente no existe.
+      archivado: false,
     });
   });
 }

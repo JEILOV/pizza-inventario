@@ -18,6 +18,24 @@
         }
       ],
       "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "ajustes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "archivado", "order": "ASCENDING" },
+        { "fieldPath": "fechaHora", "order": "DESCENDING" }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "cierres",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "archivado", "order": "ASCENDING" },
+        { "fieldPath": "fechaHora", "order": "DESCENDING" }
+      ],
+      "density": "SPARSE_ALL"
     }
   ],
   "fieldOverrides": []

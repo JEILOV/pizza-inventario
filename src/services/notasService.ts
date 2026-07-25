@@ -1,6 +1,7 @@
 import {
   collection,
   query,
+  where,
   orderBy,
   limit,
   onSnapshot,
@@ -84,8 +85,15 @@ export function subscribeAjustesRecientes(
   onData: (eventos: EventoAjuste[]) => void,
   onError?: (error: FirestoreError) => void
 ): Unsubscribe {
+  // where + orderBy sobre campos distintos pide índice compuesto — ya
+  // está declarado en firestore.indexes.json (gratis en Spark, sin
+  // costo de lecturas). Con esto Firestore descarta los archivados en
+  // el propio servidor: LIMITE_RECIENTES siempre trae 100 eventos
+  // ÚTILES, no 100 - archivados, y el conteo de lecturas no crece con
+  // el tamaño del archivo histórico.
   const q = query(
     collection(db, "ajustes"),
+    where("archivado", "==", false),
     orderBy("fechaHora", "desc"),
     limit(LIMITE_RECIENTES)
   );
@@ -105,7 +113,7 @@ export function subscribeAjustesRecientes(
           cantidad: data.cantidad as number,
           tipoAjuste: data.tipo as TipoAjuste,
           motivo: (data.motivo as string) ?? "",
-          archivado: data.archivado === true,
+          archivado: false,
         };
       });
       onData(eventos);
@@ -131,6 +139,7 @@ export function subscribeCierresConNotas(
 ): Unsubscribe {
   const q = query(
     collection(db, "cierres"),
+    where("archivado", "==", false),
     orderBy("fechaHora", "desc"),
     limit(LIMITE_RECIENTES)
   );

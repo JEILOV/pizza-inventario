@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { subscribeInsumos } from "../services/insumosService";
+import { useMemo } from "react";
+import { useInsumosContext } from "../contexts/InsumosContext";
 import type { Insumo, Zona } from "../types/insumo";
 
 interface UseInsumosPorZonaResult {
@@ -8,28 +8,21 @@ interface UseInsumosPorZonaResult {
   error: string | null;
 }
 
+/**
+ * Antes abría su propio `onSnapshot` sobre TODA la colección `insumos`
+ * cada vez que `ZoneDashboard` o `ShiftCloseChecklist` se montaban (ej.
+ * cada cambio de pestaña Cocina <-> Cerrar turno). Ahora reutiliza el
+ * único listener de `InsumosProvider` y solo filtra en memoria - cero
+ * lecturas adicionales sin importar cuántas veces se monte o cuántos
+ * componentes lo usen a la vez.
+ */
 export function useInsumosPorZona(zona: Zona): UseInsumosPorZonaResult {
-  const [insumos, setInsumos] = useState<Insumo[]>([]);
-  const [cargando, setCargando] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { insumos, cargando, error } = useInsumosContext();
 
-  useEffect(() => {
-    setCargando(true);
-    // Solo le pasamos los 2 argumentos originales
-    const unsubscribe = subscribeInsumos(
-      (data) => {
-        // Filtramos por activo y por la zona que nos piden
-        setInsumos(data.filter((i) => i.activo && i.zona === zona));
-        setCargando(false);
-      },
-      () => {
-        setError("No se pudo cargar el inventario. Revisa tu conexión.");
-        setCargando(false);
-      }
-    );
+  const insumosDeZona = useMemo(
+    () => insumos.filter((i) => i.activo && i.zona === zona),
+    [insumos, zona]
+  );
 
-    return () => unsubscribe();
-  }, [zona]);
-
-  return { insumos, cargando, error };
+  return { insumos: insumosDeZona, cargando, error };
 }

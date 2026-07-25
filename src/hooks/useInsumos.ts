@@ -1,11 +1,11 @@
-import { useEffect, useState, useCallback } from "react";
+import { useCallback } from "react";
 import {
-  subscribeInsumos,
   crearInsumo,
   actualizarInsumo,
   toggleActivoInsumo,
 } from "@/services/insumosService";
-import type { Insumo, InsumoInput } from "@/types/insumo";
+import { useInsumosContext } from "@/contexts/InsumosContext";
+import type { InsumoInput } from "@/types/insumo";
 
 interface UseInsumosResult {
   insumos: Insumo[];
@@ -23,24 +23,12 @@ interface UseInsumosResult {
  * el snapshot que llega después de escribir ya trae el cambio.
  */
 export function useInsumos(): UseInsumosResult {
-  const [insumos, setInsumos] = useState<Insumo[]>([]);
-  const [cargando, setCargando] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const unsubscribe = subscribeInsumos(
-      (data) => {
-        setInsumos(data);
-        setCargando(false);
-      },
-      () => {
-        setError("No se pudo cargar la lista de insumos. Intenta de nuevo.");
-        setCargando(false);
-      }
-    );
-
-    return () => unsubscribe();
-  }, []);
+  // Sin useState/useEffect propios: los datos vienen del único listener
+  // vivo en InsumosProvider (montado en el layout raíz). Múltiples
+  // componentes pueden llamar useInsumos() a la vez sin abrir listeners
+  // adicionales — solo se suscriben al re-render de React cuando el
+  // contexto cambia, que es gratis en términos de lecturas de Firestore.
+  const { insumos, cargando, error } = useInsumosContext();
 
   const crear = useCallback(async (input: InsumoInput) => {
     try {
