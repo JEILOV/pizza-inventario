@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo } from "react";
-import { AlertTriangle, MessageCircle } from "lucide-react";
+import { useMemo, useState } from "react";
+import { AlertTriangle, MessageCircle, ChevronDown } from "lucide-react";
 import type { Insumo, TipoInsumo } from "@/types/insumo";
 import { calcularEstado, getStockMinimoVigente } from "@/lib/reglasInventario";
 
@@ -70,6 +70,13 @@ export default function AlertasCompra({
 }: AlertasCompraProps) {
   const hoy = useMemo(() => new Date(), []);
 
+  // Colapsado por defecto: en celular (y también en desktop, por
+  // consistencia con el resto de acordeones de la app) esta alerta
+  // arranca oída pero no abierta — el usuario decide si quiere ver
+  // el detalle. Evita que la pantalla de inicio se sienta "toda roja"
+  // apenas se entra al panel.
+  const [expandido, setExpandido] = useState(false);
+
   const enAlerta = useMemo(
     () =>
       insumos
@@ -93,49 +100,72 @@ export default function AlertasCompra({
   }
 
   return (
-    <div className="mb-6 rounded-2xl border border-red-200 bg-red-50/60 p-4 sm:p-5">
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex items-start gap-2.5">
+    <div className="mb-6 overflow-hidden rounded-2xl border border-red-200 bg-red-50/60">
+      {/* Banner resumen — siempre visible, es el único punto de
+          entrada táctil. min-h-14 asegura un área cómoda para el
+          pulgar (≥56px) sin depender de cuánto padding traiga el
+          texto interno. */}
+      <button
+        type="button"
+        onClick={() => setExpandido((prev) => !prev)}
+        aria-expanded={expandido}
+        className="flex min-h-14 w-full items-center justify-between gap-3 px-4 py-3.5 text-left transition-colors hover:bg-red-100/40 sm:p-5"
+      >
+        <div className="flex min-w-0 items-start gap-2.5">
           <AlertTriangle className="mt-0.5 h-5 w-5 flex-none text-red-600" strokeWidth={2} />
-          <div>
+          <div className="min-w-0">
             <h2 className="text-sm font-semibold text-red-900">
               {titulo} — {enAlerta.length}{" "}
-              {enAlerta.length === 1 ? "insumo" : "insumos"} por debajo del mínimo
+              {enAlerta.length === 1 ? "insumo crítico" : "insumos críticos"}
             </h2>
-            <p className="text-sm text-red-700/80">{subtitulo}</p>
+            {!expandido && (
+              <p className="text-xs font-medium text-red-700/90">Toca para ver el detalle</p>
+            )}
+            {expandido && <p className="text-sm text-red-700/80">{subtitulo}</p>}
           </div>
         </div>
+        <ChevronDown
+          className={[
+            "h-5 w-5 flex-none text-red-500 transition-transform",
+            expandido ? "rotate-180" : "",
+          ].join(" ")}
+          strokeWidth={2}
+        />
+      </button>
 
-        <button
-          onClick={generarPedidoWhatsApp}
-          className="flex w-full flex-none items-center justify-center gap-2 rounded-xl bg-brand px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-hover sm:w-auto"
-        >
-          <MessageCircle className="h-4 w-4" strokeWidth={2.25} />
-          {textoBoton}
-        </button>
-      </div>
-
-      <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-        {enAlerta.map((insumo) => (
-          <li
-            key={insumo.id}
-            className="flex items-center justify-between gap-3 rounded-xl border border-red-200 bg-white px-3.5 py-2.5"
+      {expandido && (
+        <div className="border-t border-red-200/70 px-4 pb-4 pt-3 sm:px-5 sm:pb-5">
+          <button
+            onClick={generarPedidoWhatsApp}
+            className="mb-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-brand px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-hover sm:w-auto"
           >
-            <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-stone-900">{insumo.nombre}</p>
-              <p className="text-xs text-stone-500">{ETIQUETA_ZONA[insumo.zona]}</p>
-            </div>
-            <div className="flex-none text-right">
-              <p className="text-sm font-semibold text-red-700">
-                {insumo.stockActual} {insumo.unidad}
-              </p>
-              <p className="text-xs text-stone-400">
-                mín. {getStockMinimoVigente(insumo, hoy)} {insumo.unidad}
-              </p>
-            </div>
-          </li>
-        ))}
-      </ul>
+            <MessageCircle className="h-4 w-4" strokeWidth={2.25} />
+            {textoBoton}
+          </button>
+
+          <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {enAlerta.map((insumo) => (
+              <li
+                key={insumo.id}
+                className="flex items-center justify-between gap-3 rounded-xl border border-red-200 bg-white px-3.5 py-2.5"
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-stone-900">{insumo.nombre}</p>
+                  <p className="text-xs text-stone-500">{ETIQUETA_ZONA[insumo.zona]}</p>
+                </div>
+                <div className="flex-none text-right">
+                  <p className="text-sm font-semibold text-red-700">
+                    {insumo.stockActual} {insumo.unidad}
+                  </p>
+                  <p className="text-xs text-stone-400">
+                    mín. {getStockMinimoVigente(insumo, hoy)} {insumo.unidad}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }

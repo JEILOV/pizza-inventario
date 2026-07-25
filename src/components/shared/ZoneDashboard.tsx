@@ -84,7 +84,12 @@ export default function ZoneDashboard({
   const [tabActiva, setTabActiva] = useState<TabZona>("inventario");
   const [busqueda, setBusqueda] = useState("");
   const [seccionAbierta, setSeccionAbierta] = useState({
-    rojo: true,
+    // Todas las secciones arrancan cerradas: en celular, mostrar de
+    // golpe las tarjetas de "Por reponer ahora" hacía que la pantalla
+    // de inicio se sintiera saturada apenas se entraba al panel.
+    // AlertasCompra (arriba) ya resume lo urgente en un banner
+    // colapsable; este acordeón es para quien quiere profundizar.
+    rojo: false,
     amarillo: false,
     todos: false,
   });
@@ -472,7 +477,7 @@ function Acordeon({
       <button
         type="button"
         onClick={onToggle}
-        className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left transition-colors hover:bg-stone-50 sm:px-5"
+        className="flex min-h-14 w-full items-center justify-between gap-3 px-4 py-4 text-left transition-colors hover:bg-stone-50 active:bg-stone-100 sm:px-5"
       >
         <div className="flex min-w-0 items-center gap-3">
           <span className={["flex h-9 w-9 flex-none items-center justify-center rounded-xl", colorIcono].join(" ")}>
@@ -520,7 +525,7 @@ function SubgrupoTipo({
       <button
         type="button"
         onClick={onToggle}
-        className="mb-2 flex w-full items-center justify-between gap-2 rounded-lg px-1 py-1.5 text-left hover:bg-stone-50"
+        className="mb-2 flex min-h-11 w-full items-center justify-between gap-2 rounded-lg px-2 py-2.5 text-left hover:bg-stone-50 active:bg-stone-100"
       >
         <span className="flex items-center gap-2">
           <span className={["inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium", color].join(" ")}>
