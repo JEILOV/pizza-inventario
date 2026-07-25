@@ -185,56 +185,103 @@ function PantallaLogin() {
   const { iniciarSesionConGoogle, error } = useAuth();
 
   return (
-    <div className="flex min-h-screen flex-col bg-stone-50">
+    <div className="relative flex min-h-screen flex-col overflow-hidden bg-paper">
+      {/* Textura de fondo — grano de puntos finísimo en el mismo teal de
+          marca, casi imperceptible. Es ambiente, no protagonista: el
+          protagonista es la comanda de abajo. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        style={{
+          backgroundImage:
+            "radial-gradient(circle at 1px 1px, rgba(0,102,84,0.08) 1px, transparent 0)",
+          backgroundSize: "20px 20px",
+        }}
+      />
+
       {/* Cuerpo centrado */}
-      <div className="flex flex-1 flex-col items-center justify-center px-4 py-12">
-        <div className="w-full max-w-sm overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
-          {/* Acento de marca — el logo trae su propio color corporativo
-              (isotipo + wordmark en #006654 sobre fondo blanco opaco),
-              así que no va sobre una franja verde: eso lo dejaría
-              invisible. Solo una línea fina como guiño de marca. */}
-          <div className="h-1.5 bg-brand" />
+      <div className="relative flex flex-1 flex-col items-center justify-center px-4 py-12">
+        <div className="relative w-full max-w-sm motion-safe:animate-[ticket-in_0.6s_ease-out_forwards]">
+          {/* La comanda: el login se presenta como el ticket que sale de
+              la impresora de cocina — coherente con lo que esta app
+              realmente gestiona (insumos, turnos, stock). */}
+          <div className="relative overflow-hidden rounded-[6px] bg-white shadow-[0_25px_55px_-20px_rgba(0,40,32,0.45)]">
+            <div className="flex flex-col items-center gap-2.5 px-6 pb-6 pt-9">
+              <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.28em] text-stone-400">
+                Acceso de personal
+              </span>
 
-          <div className="flex flex-col items-center gap-1 px-6 pb-2 pt-7">
-            <Image
-              src="/logo-pizza-republic.png"
-              alt="Pizza Republic"
-              width={1220}
-              height={507}
-              className="h-auto w-52"
-              priority
-            />
-            <p className="text-xs font-medium uppercase tracking-wide text-stone-400">
-              Inventario
-            </p>
-          </div>
+              <Image
+                src="/logo-pizza-republic.png"
+                alt="Pizza Republic"
+                width={1220}
+                height={507}
+                className="h-auto w-48"
+                priority
+              />
 
-          {/* Formulario */}
-          <div className="flex flex-col gap-5 px-6 pb-7 pt-5">
-            <p className="text-center text-sm text-stone-500">
-              Inicia sesión con tu cuenta de Google para continuar.
-            </p>
+              <span className="rounded-sm border border-dashed border-brass/70 px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-[0.22em] text-brass">
+                Inventario
+              </span>
+            </div>
 
-            <button
-              onClick={iniciarSesionConGoogle}
-              className="flex w-full items-center justify-center gap-2.5 rounded-xl bg-brand px-4 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-hover"
-            >
-              <GoogleIcon className="h-4 w-4" />
-              Continuar con Google
-            </button>
+            {/* Línea de corte — separa la "identidad" de la comanda (arriba)
+                de la acción que hay que tomar (abajo). */}
+            <div className="mx-6 border-t border-dashed border-stone-300" />
 
-            {error && (
-              <p className="flex items-center gap-1.5 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
-                <AlertTriangle className="h-4 w-4 flex-none" strokeWidth={2} />
-                {error}
+            <div className="flex flex-col gap-5 px-6 pb-7 pt-6">
+              <p className="text-center text-sm text-stone-500">
+                Inicia sesión con tu cuenta de Google para continuar.
               </p>
-            )}
+
+              <button
+                onClick={iniciarSesionConGoogle}
+                className="flex w-full items-center justify-center gap-2.5 rounded-xl bg-brand px-4 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:ring-offset-2"
+              >
+                <GoogleIcon className="h-4 w-4" />
+                Continuar con Google
+              </button>
+
+              {error && (
+                <p className="flex items-center gap-1.5 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+                  <AlertTriangle className="h-4 w-4 flex-none" strokeWidth={2} />
+                  {error}
+                </p>
+              )}
+            </div>
+
+            {/* Remate de la comanda — franja tipo código de barras.
+                Puramente decorativo, el único lugar donde el acento de
+                latón se repite con un poco más de presencia. */}
+            <div
+              aria-hidden
+              className="h-2.5 w-full opacity-50"
+              style={{
+                backgroundImage:
+                  "repeating-linear-gradient(90deg, var(--color-brass) 0 2px, transparent 2px 6px, var(--color-brass) 6px 7px, transparent 7px 13px, var(--color-brass) 13px 16px, transparent 16px 24px, var(--color-brass) 24px 25px, transparent 25px 30px)",
+              }}
+            />
           </div>
+
+          {/* Perforación superior — muerde el borde de la comanda, como
+              si se hubiera arrancado de un taco de tickets. Vive fuera
+              de la tarjeta (no la recorta el overflow-hidden) y pinta
+              encima porque va después en el DOM. */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -top-[7px] left-0 right-0 z-10 h-[14px]"
+            style={{
+              backgroundImage:
+                "radial-gradient(circle at 10px 7px, transparent 7px, var(--color-paper) 7.5px)",
+              backgroundSize: "20px 14px",
+              backgroundRepeat: "repeat-x",
+            }}
+          />
         </div>
       </div>
 
-      {/* Footer sutil, fuera de la tarjeta */}
-      <footer className="pb-6 text-center text-xs text-stone-400">
+      {/* Footer sutil, fuera de la comanda */}
+      <footer className="relative pb-6 text-center font-mono text-[11px] tracking-wide text-stone-400">
         Desarrollado por Jordan
       </footer>
     </div>

@@ -22,6 +22,29 @@
 @theme {
   --color-brand: #006654;
   --color-brand-hover: #004c3f;
+
+  /*
+   * Acentos SOLO para la pantalla de login (no son parte del manual de
+   * marca, son una decisión de diseño de esta pantalla puntual):
+   * --color-paper emula el papel de una comanda de cocina, --color-brass
+   * el detalle de latón/bronce de los herrajes de cocina, usado con
+   * moderación en bordes punteados y el remate tipo código de barras.
+   */
+  --color-paper: #f6f1e7;
+  --color-brass: #b4913f;
+}
+
+/* Entrada suave de la comanda de login — un solo golpe, no un loop.
+   motion-safe: en el className respeta prefers-reduced-motion. */
+@keyframes ticket-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @media (prefers-color-scheme: dark) {
