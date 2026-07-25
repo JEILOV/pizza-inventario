@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import {
   Plus,
   Pencil,
+  Trash2,
   X,
   Search,
   Soup,
@@ -59,8 +60,16 @@ type FiltroZona = "todas" | Zona;
 type FiltroTipo = "todos" | TipoInsumo;
 
 export default function AdminInsumosCRUD() {
-  const { insumos, cargando, error, crear, actualizar, toggleActivo: toggleActivoRemoto } =
-    useInsumos();
+  const {
+    insumos,
+    cargando,
+    error,
+    crear,
+    actualizar,
+    toggleActivo: toggleActivoRemoto,
+    eliminar,
+  } = useInsumos();
+  const [eliminandoId, setEliminandoId] = useState<string | null>(null);
   const [busqueda, setBusqueda] = useState("");
   const [filtroZona, setFiltroZona] = useState<FiltroZona>("todas");
   const [filtroTipo, setFiltroTipo] = useState<FiltroTipo>("todos");
@@ -184,6 +193,26 @@ export default function AdminInsumosCRUD() {
       // Silencioso a propósito: si falla, el listener simplemente no
       // refleja el cambio y el admin puede reintentar el toggle.
       console.error("No se pudo cambiar el estado del insumo", id);
+    }
+  };
+
+  // Eliminación DURA: pide confirmación explícita porque no hay
+  // vuelta atrás (a diferencia de toggleActivo, que es reversible).
+  const eliminarConConfirmacion = async (insumo: Insumo) => {
+    const confirmado = window.confirm(
+      `¿Estás seguro de que deseas eliminar "${insumo.nombre}"? Esta acción no se puede deshacer.`
+    );
+    if (!confirmado) return;
+
+    setEliminandoId(insumo.id);
+    try {
+      await eliminar(insumo.id);
+      // No hace falta tocar estado local: el listener onSnapshot
+      // de useInsumos recibe el cambio y re-renderiza solo.
+    } catch {
+      window.alert("No se pudo eliminar el insumo. Intenta de nuevo.");
+    } finally {
+      setEliminandoId(null);
     }
   };
 
@@ -332,13 +361,27 @@ export default function AdminInsumosCRUD() {
                   </button>
                 </td>
                 <td className="px-4 py-3 text-right">
-                  <button
-                    onClick={() => abrirEdicion(insumo)}
-                    className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-stone-500 hover:bg-stone-100 hover:text-stone-700"
-                  >
-                    <Pencil className="h-3.5 w-3.5" strokeWidth={1.75} />
-                    Editar
-                  </button>
+                  <div className="inline-flex items-center gap-1">
+                    <button
+                      onClick={() => abrirEdicion(insumo)}
+                      className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-stone-500 hover:bg-stone-100 hover:text-stone-700"
+                    >
+                      <Pencil className="h-3.5 w-3.5" strokeWidth={1.75} />
+                      Editar
+                    </button>
+                    <button
+                      onClick={() => eliminarConConfirmacion(insumo)}
+                      disabled={eliminandoId === insumo.id}
+                      className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-red-500 hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {eliminandoId === insumo.id ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} />
+                      )}
+                      Eliminar
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -371,12 +414,25 @@ export default function AdminInsumosCRUD() {
                   <BadgeTipo tipo={insumo.tipo} />
                 </div>
               </div>
-              <button
-                onClick={() => abrirEdicion(insumo)}
-                className="flex h-8 w-8 flex-none items-center justify-center rounded-lg text-stone-400 hover:bg-stone-100 hover:text-stone-700"
-              >
-                <Pencil className="h-4 w-4" strokeWidth={1.75} />
-              </button>
+              <div className="flex flex-none items-center gap-1">
+                <button
+                  onClick={() => abrirEdicion(insumo)}
+                  className="flex h-8 w-8 flex-none items-center justify-center rounded-lg text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+                >
+                  <Pencil className="h-4 w-4" strokeWidth={1.75} />
+                </button>
+                <button
+                  onClick={() => eliminarConConfirmacion(insumo)}
+                  disabled={eliminandoId === insumo.id}
+                  className="flex h-8 w-8 flex-none items-center justify-center rounded-lg text-red-400 hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {eliminandoId === insumo.id ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4" strokeWidth={1.75} />
+                  )}
+                </button>
+              </div>
             </div>
 
             <div className="mt-3 grid grid-cols-3 gap-2 text-xs">

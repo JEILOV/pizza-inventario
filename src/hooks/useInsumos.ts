@@ -3,6 +3,7 @@ import {
   crearInsumo,
   actualizarInsumo,
   toggleActivoInsumo,
+  eliminarInsumo,
 } from "@/services/insumosService";
 import { useInsumosContext } from "@/contexts/InsumosContext";
 import type { Insumo, InsumoInput } from "@/types/insumo";
@@ -14,6 +15,7 @@ interface UseInsumosResult {
   crear: (input: InsumoInput) => Promise<void>;
   actualizar: (id: string, cambios: Partial<InsumoInput>) => Promise<void>;
   toggleActivo: (id: string, activo: boolean) => Promise<void>;
+  eliminar: (id: string) => Promise<void>;
 }
 
 /**
@@ -57,5 +59,14 @@ export function useInsumos(): UseInsumosResult {
     }
   }, []);
 
-  return { insumos, cargando, error, crear, actualizar, toggleActivo };
+  const eliminar = useCallback(async (id: string) => {
+    try {
+      await eliminarInsumo(id);
+    } catch (e) {
+      console.error(e);
+      throw new Error("No se pudo eliminar el insumo.");
+    }
+  }, []);
+
+  return { insumos, cargando, error, crear, actualizar, toggleActivo, eliminar };
 }

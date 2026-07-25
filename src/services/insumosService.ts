@@ -3,6 +3,7 @@ import {
   onSnapshot,
   addDoc,
   updateDoc,
+  deleteDoc,
   doc,
   orderBy,
   query,
@@ -100,4 +101,15 @@ export async function toggleActivoInsumo(id: string, activo: boolean): Promise<v
     activo,
     actualizadoEn: serverTimestamp(),
   });
+}
+
+/**
+ * Eliminación DURA: borra el documento de Firestore de forma
+ * irreversible. A diferencia de toggleActivoInsumo (soft delete),
+ * esto saca el insumo por completo de la base de datos. Pensado
+ * para corregir errores de creación, no para el flujo normal de
+ * "dar de baja" un insumo (para eso ya existe activo/inactivo).
+ */
+export async function eliminarInsumo(id: string): Promise<void> {
+  await deleteDoc(doc(db, COLECCION, id));
 }
