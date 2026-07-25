@@ -5,7 +5,7 @@ import {
   toggleActivoInsumo,
 } from "@/services/insumosService";
 import { useInsumosContext } from "@/contexts/InsumosContext";
-import type { InsumoInput } from "@/types/insumo";
+import type { Insumo, InsumoInput } from "@/types/insumo";
 
 interface UseInsumosResult {
   insumos: Insumo[];
