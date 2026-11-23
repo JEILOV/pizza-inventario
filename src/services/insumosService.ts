@@ -21,6 +21,11 @@ const COLECCION = "insumos";
 function mapearDocumento(id: string, data: Record<string, unknown>): Insumo {
   return {
     id,
+    categoria: (data.categoria as string) ?? "",
+    ubicacion: (data.ubicacion as string) ?? "",
+    stockObjetivo: (data.stockObjetivo as number | null) ?? null,
+    stockObjetivoFinDeSemana: (data.stockObjetivoFinDeSemana as number | null) ?? null,
+    consumoDiarioEstimado: (data.consumoDiarioEstimado as number | null) ?? null,
     nombre: data.nombre as string,
     zona: data.zona as Insumo["zona"],
     tipo: data.tipo as Insumo["tipo"],

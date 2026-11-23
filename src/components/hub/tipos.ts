@@ -1,4 +1,6 @@
 export type VistaId =
+  | "hoy"
+  | "personal"
   | "insumos"
   | "cocina-dashboard"
   | "cocina-cierre"

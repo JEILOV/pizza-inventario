@@ -1,3 +1,5 @@
+import OperacionPanel from "@/components/shared/OperacionPanel";
+import PersonalPanel from "@/components/admin/PersonalPanel";
 import AdminInsumosCRUD from "@/components/admin/AdminInsumosCRUD";
 import BuzonNotas from "@/components/admin/BuzonNotas";
 import KitchenDashboard from "@/components/cocina/KitchenDashboard";
@@ -27,6 +29,8 @@ export default function ControlPanel({
   onIrACierreSalon,
 }: ControlPanelProps) {
   switch (vista) {
+    case "hoy": return <OperacionPanel />;
+    case "personal": return <PersonalPanel />;
     case "insumos":
       return <AdminInsumosCRUD />;
     case "cocina-dashboard":

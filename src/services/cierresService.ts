@@ -1,7 +1,7 @@
 import {
   collection,
   doc,
-  writeBatch,
+  runTransaction,
   serverTimestamp,
   query,
   where,
@@ -28,25 +28,19 @@ export interface CierreInput {
   items: CierreItemInput[];
 }
 
-/**
- * Confirma un cierre de turno completo: crea el documento de historial
- * en `cierres` y actualiza `stockActual` de cada insumo contado, todo
- * en un único batch — o se escribe todo, o no se escribe nada.
- *
- * Nota de diseño: usamos writeBatch (no runTransaction) porque los
- * valores que se escriben son conteos absolutos ingresados por la
- * persona que cierra, no dependen de leer el valor actual en el
- * servidor antes de escribir. Si más adelante el "Ajuste Rápido"
- * concurrente se vuelve un problema real (alguien ajusta un insumo
- * justo mientras otro está cerrando turno), se puede migrar esta
- * función a runTransaction para leer y comparar stockActual antes
- * de sobrescribir.
- */
+/** Guarda el cierre de forma atómica y detecta cambios de stock ocurridos durante el conteo. */
 export async function confirmarCierreTurno(input: CierreInput): Promise<string> {
-  const batch = writeBatch(db);
+  if (!input.items.length || input.items.length > 400 || new Set(input.items.map((i) => i.insumoId)).size !== input.items.length) throw new Error("Revisa los insumos del cierre (entre 1 y 400, sin duplicados).");
+  if (input.items.some((i) => !Number.isFinite(i.stockNuevo) || i.stockNuevo < 0)) throw new Error("Revisa las cantidades del cierre.");
 
   const cierreRef = doc(collection(db, "cierres"));
-  batch.set(cierreRef, {
+  await runTransaction(db, async (tx) => {
+    const lecturas = await Promise.all(input.items.map((i) => tx.get(doc(db, "insumos", i.insumoId))));
+    lecturas.forEach((snap, n) => {
+      if (!snap.exists() || snap.data().zona !== input.zona || snap.data().activo === false) throw new Error("Revisa el inventario: un insumo cambió o fue desactivado.");
+      if (snap.data().stockActual !== input.items[n].stockAnterior) throw new Error(`Revisa ${snap.data().nombre}: el stock cambió mientras contabas. Vuelve a contar y edita esa cantidad antes de confirmar.`);
+    });
+    tx.set(cierreRef, {
     zona: input.zona,
     turno: input.turno,
     usuarioId: input.usuarioId,
@@ -67,13 +61,13 @@ export async function confirmarCierreTurno(input: CierreInput): Promise<string> 
 
   for (const item of input.items) {
     const insumoRef = doc(db, "insumos", item.insumoId);
-    batch.update(insumoRef, {
+    tx.update(insumoRef, {
       stockActual: item.stockNuevo,
       actualizadoEn: serverTimestamp(),
     });
   }
 
-  await batch.commit();
+  });
   return cierreRef.id;
 }
 

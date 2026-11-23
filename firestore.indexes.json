@@ -23,8 +23,14 @@
       "collectionGroup": "ajustes",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "archivado", "order": "ASCENDING" },
-        { "fieldPath": "fechaHora", "order": "DESCENDING" }
+        {
+          "fieldPath": "archivado",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "fechaHora",
+          "order": "DESCENDING"
+        }
       ],
       "density": "SPARSE_ALL"
     },
@@ -32,10 +38,48 @@
       "collectionGroup": "cierres",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "archivado", "order": "ASCENDING" },
-        { "fieldPath": "fechaHora", "order": "DESCENDING" }
+        {
+          "fieldPath": "archivado",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "fechaHora",
+          "order": "DESCENDING"
+        }
       ],
       "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "reportes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "zona",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "resuelto",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "tareasTurno",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "zona",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "fecha",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "turno",
+          "order": "ASCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": []

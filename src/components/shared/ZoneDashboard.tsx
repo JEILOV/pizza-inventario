@@ -25,6 +25,7 @@ import {
   esFinDeSemana,
   getStockMinimoVigente,
 } from "@/lib/reglasInventario";
+import { categoriaDe, ordenarInsumos, normalizar } from "@/lib/operacion";
 import AjusteRapidoModal from "@/components/shared/AjusteRapidoModal";
 import AlertasCompra from "@/components/shared/AlertasCompra";
 import ShiftCloseChecklist from "@/components/salon/ShiftCloseChecklist";
@@ -82,6 +83,7 @@ export default function ZoneDashboard({
   //    useInsumosPorZona — cambiar de pestaña o buscar es puramente
   //    en memoria sobre los datos que ya trajo InsumosProvider. ──
   const [tabActiva, setTabActiva] = useState<TabZona>("inventario");
+  const [categoria, setCategoria] = useState("");
   const [busqueda, setBusqueda] = useState("");
   const [seccionAbierta, setSeccionAbierta] = useState({
     // Todas las secciones arrancan cerradas: en celular, mostrar de
@@ -126,7 +128,7 @@ export default function ZoneDashboard({
   const finDeSemana = esFinDeSemana(hoy);
 
   const { rojos, amarillos, todosOrdenados, totalExternos, totalInternos } = useMemo(() => {
-    const ordenados = [...insumos].sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+    const ordenados = ordenarInsumos(insumos);
     return {
       rojos: insumos.filter((i) => calcularEstado(i, hoy) === "rojo"),
       amarillos: insumos.filter((i) => calcularEstado(i, hoy) === "amarillo"),
@@ -150,7 +152,7 @@ export default function ZoneDashboard({
   //    no hace falta memoizar esto por separado). ──
   const busquedaNormalizada = busqueda.trim().toLowerCase();
   const coincide = (i: Insumo) =>
-    busquedaNormalizada === "" || i.nombre.toLowerCase().includes(busquedaNormalizada);
+    (!categoria || categoriaDe(i) === categoria) && normalizar(`${i.nombre} ${i.ubicacion ?? ""}`).includes(normalizar(busquedaNormalizada));
 
   const rojosFiltrados = rojos.filter(coincide);
   const amarillosFiltrados = amarillos.filter(coincide);
@@ -158,7 +160,7 @@ export default function ZoneDashboard({
   const internosFiltrados = todosFiltrados.filter((i) => i.tipo === "interno");
   const externosFiltrados = todosFiltrados.filter((i) => i.tipo === "externo");
 
-  const hayBusqueda = busquedaNormalizada !== "";
+  const hayBusqueda = busquedaNormalizada !== "" || categoria !== "";
 
   const toggleSeccion = (clave: keyof typeof seccionAbierta) =>
     setSeccionAbierta((prev) => ({ ...prev, [clave]: !prev[clave] }));
@@ -322,6 +324,7 @@ export default function ZoneDashboard({
             </div>
           </div>
 
+          <label className="mb-4 block">Categoría<select className="ops-input" value={categoria} onChange={(e) => setCategoria(e.target.value)}><option value="">Todas las categorías</option>{[...new Set(insumos.map(categoriaDe))].sort().map((c) => <option key={c}>{c}</option>)}</select></label>
           {/* Buscador local — filtra en memoria por nombre, cero
               lecturas nuevas a Firestore. */}
           <div className="relative mb-5">

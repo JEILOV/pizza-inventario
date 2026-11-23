@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useInsumosPorZona } from "@/hooks/useInsumosPorZona";
 import { confirmarCierreTurno } from "@/services/cierresService";
+import { categoriaDe, ordenarInsumos, normalizar, fechaLocal, turnoActual } from "@/lib/operacion";
 import type { Zona } from "@/types/insumo";
 
 // ─────────────────────────────────────────────────────────────
@@ -22,6 +23,7 @@ interface ItemCierre {
   nuevoConteo: string; // se maneja como string para permitir campo vacío mientras se escribe
   nota: string;
   notaAbierta: boolean;
+  stockAlContar?: number;
 }
 
 // Umbral por el cual una diferencia se considera "revisar antes de enviar"
@@ -50,16 +52,13 @@ function esDiferenciaGrande(stockActual: number, delta: number) {
 function esConteoValido(valor: string): boolean {
   if (valor.trim() === "") return false;
   const n = Number(valor);
-  return !Number.isNaN(n) && n >= 0;
+  return Number.isFinite(n) && n >= 0;
 }
 
 // Heurística simple mientras no haya turnos configurados en el backend —
 // reemplazar cuando exista un selector de turno real o venga del roster.
 function getTurnoActual(): string {
-  const hora = new Date().getHours();
-  if (hora < 12) return "mañana";
-  if (hora < 18) return "tarde";
-  return "noche";
+  return turnoActual();
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -77,10 +76,44 @@ export default function ShiftCloseChecklist({
 }) {
   const { insumos, cargando, error } = useInsumosPorZona(zona);
 
+  const [turnoElegido, setTurnoElegido] = useState(turno ?? getTurnoActual());
+  const [fechaConteo] = useState(fechaLocal());
+  const claveBorrador = `pizza-cierre:${usuarioId}:${zona}:${fechaConteo}:${turnoElegido}`;
+  const [borradorCargado, setBorradorCargado] = useState("");
+  const [avisoBorrador, setAvisoBorrador] = useState("");
+  const [categoria, setCategoria] = useState("");
+  const [busqueda, setBusqueda] = useState("");
+  const [notaGeneral, setNotaGeneral] = useState("");
   const [items, setItems] = useState<Record<string, ItemCierre>>({});
   const [enviando, setEnviando] = useState(false);
   const [enviado, setEnviado] = useState(false);
   const [errorEnvio, setErrorEnvio] = useState<string | null>(null);
+
+  useEffect(() => {
+    setItems({}); setNotaGeneral(""); setAvisoBorrador("");
+    try {
+      const raw = sessionStorage.getItem(claveBorrador);
+      if (raw) {
+        const draft = JSON.parse(raw);
+        if (draft.items && typeof draft.items === "object") {
+          const validos: Record<string, ItemCierre> = {};
+          for (const [id, valor] of Object.entries(draft.items)) {
+            const item = valor as ItemCierre;
+            if (typeof item?.nuevoConteo === "string" && typeof item?.nota === "string") validos[id] = item;
+          }
+          setItems(validos); setNotaGeneral(typeof draft.notaGeneral === "string" ? draft.notaGeneral : "");
+          setAvisoBorrador("Conteo recuperado. Revisa las cantidades antes de confirmar.");
+        }
+      }
+    } catch { setAvisoBorrador("No se pudo recuperar el borrador. Puedes empezar un conteo nuevo."); }
+    setBorradorCargado(claveBorrador);
+  }, [claveBorrador]);
+  useEffect(() => {
+    if (borradorCargado !== claveBorrador || enviado) return;
+    try { sessionStorage.setItem(claveBorrador, JSON.stringify({ items, notaGeneral })); }
+    catch { setAvisoBorrador("Este navegador no permite guardar el borrador. Mantén la pantalla abierta hasta confirmar."); }
+  }, [items, notaGeneral, borradorCargado, claveBorrador, enviado]);
+  const visibles = ordenarInsumos(insumos).filter((i) => (!categoria || categoriaDe(i) === categoria) && normalizar(`${i.nombre} ${i.ubicacion ?? ""}`).includes(normalizar(busqueda)));
 
   // Única fuente de lectura de `items`. Cubre la ventana de la condición
   // de carrera: el useEffect de abajo llena `items` después del commit,
@@ -113,21 +146,21 @@ export default function ShiftCloseChecklist({
   const actualizarConteo = (id: string, valor: string) => {
     setItems((prev) => ({
       ...prev,
-      [id]: { ...prev[id], nuevoConteo: valor },
+      [id]: { ...(prev[id] ?? { nuevoConteo: "", nota: "", notaAbierta: false }), nuevoConteo: valor, stockAlContar: insumos.find((i) => i.id === id)?.stockActual },
     }));
   };
 
   const actualizarNota = (id: string, valor: string) => {
     setItems((prev) => ({
       ...prev,
-      [id]: { ...prev[id], nota: valor },
+      [id]: { ...(prev[id] ?? { nuevoConteo: "", nota: "", notaAbierta: false }), nota: valor },
     }));
   };
 
   const toggleNota = (id: string) => {
     setItems((prev) => ({
       ...prev,
-      [id]: { ...prev[id], notaAbierta: !prev[id].notaAbierta },
+      [id]: { ...(prev[id] ?? { nuevoConteo: "", nota: "", notaAbierta: false }), notaAbierta: !prev[id]?.notaAbierta },
     }));
   };
 
@@ -146,24 +179,26 @@ export default function ShiftCloseChecklist({
     try {
       await confirmarCierreTurno({
         zona,
-        turno: turno ?? getTurnoActual(),
+        turno: turnoElegido,
+        notaGeneral,
         usuarioId,
         items: insumos.map((insumo) => {
           const item = getItem(insumo.id);
           const nuevo = Number(item.nuevoConteo);
           return {
             insumoId: insumo.id,
-            stockAnterior: insumo.stockActual,
+            stockAnterior: item.stockAlContar ?? insumo.stockActual,
             stockNuevo: nuevo,
-            diferencia: nuevo - insumo.stockActual,
+            diferencia: nuevo - (item.stockAlContar ?? insumo.stockActual),
             nota: item.nota.trim() || undefined,
           };
         }),
       });
       setEnviado(true);
+      try { sessionStorage.removeItem(claveBorrador); } catch { /* El cierre ya está guardado. */ }
     } catch (e) {
       console.error("Error al confirmar cierre de turno:", e);
-      setErrorEnvio("No se pudo guardar el cierre. Revisa tu conexión e inténtalo de nuevo.");
+      setErrorEnvio(e instanceof Error && e.message.startsWith("Revisa") ? e.message : "No se pudo guardar el cierre. Revisa tu conexión e inténtalo de nuevo.");
     } finally {
       setEnviando(false);
     }
@@ -202,6 +237,8 @@ export default function ShiftCloseChecklist({
         <button
           onClick={() => {
             setItems({});
+            setNotaGeneral("");
+            setAvisoBorrador("");
             setEnviado(false);
           }}
           className="mt-2 rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50"
@@ -232,6 +269,12 @@ export default function ShiftCloseChecklist({
         </span>
       </div>
 
+      <div className="mb-4 grid gap-3 sm:grid-cols-3">
+        <label>Turno<select disabled={enviando} className="ops-input" value={turnoElegido} onChange={(e) => setTurnoElegido(e.target.value)}>{["mañana", "tarde", "noche"].map((t) => <option key={t}>{t}</option>)}</select></label>
+        <label>Categoría<select className="ops-input" value={categoria} onChange={(e) => setCategoria(e.target.value)}><option value="">Todas las categorías</option>{[...new Set(insumos.map(categoriaDe))].sort().map((c) => <option key={c}>{c}</option>)}</select></label>
+        <label>Buscar<input className="ops-input" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Insumo o ubicación" /></label>
+      </div>
+      <p className="mb-4 text-sm text-stone-600">{avisoBorrador || "El avance se conserva en esta pestaña. Vacío significa sin contar; escribe 0 solo si no queda nada."}</p>
       {/* Encabezado de tabla — solo visible en escritorio */}
       <div className="mb-2 hidden grid-cols-[1.6fr_0.9fr_1fr_0.7fr_auto] gap-4 px-4 text-xs font-medium uppercase tracking-wide text-stone-400 md:grid">
         <span>Insumo</span>
@@ -243,7 +286,7 @@ export default function ShiftCloseChecklist({
 
       {/* Lista de insumos */}
       <ul className="flex flex-col gap-3">
-        {insumos.map((insumo) => {
+        {visibles.map((insumo) => {
           const item = getItem(insumo.id);
           const delta = calcularDelta(insumo.stockActual, item.nuevoConteo);
           const alerta = delta !== null && esDiferenciaGrande(insumo.stockActual, delta);
@@ -281,6 +324,7 @@ export default function ShiftCloseChecklist({
                     <p className="truncate font-medium text-stone-900">
                       {insumo.nombre}
                     </p>
+                    <p className="text-sm text-stone-500">{categoriaDe(insumo)}{insumo.ubicacion && ` · ${insumo.ubicacion}`}</p>
                     <p className="text-xs text-stone-400 md:hidden">
                       Stock actual: {insumo.stockActual} {insumo.unidad}
                     </p>
@@ -396,6 +440,7 @@ export default function ShiftCloseChecklist({
         })}
       </ul>
 
+      <label className="mt-5 block">Para el siguiente turno<textarea className="ops-input" rows={3} maxLength={1000} value={notaGeneral} onChange={(e) => setNotaGeneral(e.target.value)} placeholder="Qué falta, qué quedó listo o qué debe revisar el siguiente equipo" /></label>
       {/* Acción principal */}
       <div className="sticky bottom-0 mt-6 -mx-4 border-t border-stone-200 bg-white/95 px-4 py-4 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
         {errorEnvio && (

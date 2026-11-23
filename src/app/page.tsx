@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import {
   Settings,
+  Users,
+  ListChecks,
   ChefHat,
   Store,
   ClipboardList,
@@ -32,25 +34,29 @@ interface TabConfig {
 
 const TABS_POR_ROL: Record<RolUsuario, TabConfig[]> = {
   admin: [
+    { id: "hoy", label: "Hoy", icono: <ListChecks className="h-4 w-4" /> },
+    { id: "personal", label: "Personal", icono: <Users className="h-4 w-4" /> },
     { id: "insumos", label: "Insumos", icono: <Settings className="h-4 w-4" /> },
     { id: "cocina-dashboard", label: "Cocina", icono: <ChefHat className="h-4 w-4" /> },
     { id: "salon-dashboard", label: "Salón", icono: <Store className="h-4 w-4" /> },
     { id: "notas", label: "Buzón de notas", icono: <Inbox className="h-4 w-4" /> },
   ],
   cocina: [
+    { id: "hoy", label: "Hoy", icono: <ListChecks className="h-4 w-4" /> },
     { id: "cocina-dashboard", label: "Panel", icono: <ChefHat className="h-4 w-4" /> },
     { id: "cocina-cierre", label: "Cerrar turno", icono: <ClipboardList className="h-4 w-4" /> },
   ],
   salon: [
+    { id: "hoy", label: "Hoy", icono: <ListChecks className="h-4 w-4" /> },
     { id: "salon-dashboard", label: "Panel", icono: <Store className="h-4 w-4" /> },
     { id: "salon-cierre", label: "Cerrar turno", icono: <ClipboardList className="h-4 w-4" /> },
   ],
 };
 
 const VISTA_INICIAL_POR_ROL: Record<RolUsuario, VistaId> = {
-  admin: "insumos",
-  cocina: "cocina-dashboard",
-  salon: "salon-dashboard",
+  admin: "hoy",
+  cocina: "hoy",
+  salon: "hoy",
 };
 
 const ESTILO_ROL: Record<RolUsuario, string> = {
@@ -294,7 +300,7 @@ function PantallaLogin() {
 // ─────────────────────────────────────────────────────────────
 
 function CuentaPendiente() {
-  const { cerrarSesion, recargarPermisos, error } = useAuth();
+  const { cerrarSesion, recargarPermisos, error, cuentaDesactivada, nombreCuenta } = useAuth();
   const [verificando, setVerificando] = useState(false);
 
   const handleVerificar = async () => {
@@ -310,12 +316,10 @@ function CuentaPendiente() {
     <div className="flex min-h-screen flex-col items-center justify-center bg-stone-50 px-4 text-center">
       <ShieldQuestion className="h-10 w-10 text-amber-500" strokeWidth={1.5} />
       <h1 className="mt-3 text-lg font-semibold text-stone-900">
-        Tu cuenta está pendiente de activación
+        {cuentaDesactivada ? "Tu acceso está desactivado" : `Bienvenido, ${nombreCuenta || "al equipo"}`}
       </h1>
       <p className="mt-2 max-w-sm text-sm text-stone-500">
-        Iniciaste sesión correctamente, pero todavía no tienes un rol
-        asignado en el sistema. Pídele a un administrador que te agregue,
-        y luego presiona &quot;Ya me activaron&quot;.
+        {cuentaDesactivada ? "Contacta al administrador si necesitas volver a trabajar con esta cuenta." : "Ya ingresaste. Tu perfil aparece en Personal del administrador. Cuando te asigne cocina o salón, entrarás automáticamente a tu panel."}
       </p>
 
       <div className="mt-6 flex gap-3">
@@ -335,7 +339,7 @@ function CuentaPendiente() {
           ) : (
             <RefreshCw className="h-4 w-4" strokeWidth={2} />
           )}
-          Ya me activaron
+          Reintentar conexión
         </button>
       </div>
 

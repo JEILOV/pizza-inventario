@@ -44,13 +44,16 @@ export async function registrarAjusteRapido(input: AjusteInput): Promise<void> {
     if (!snap.exists()) {
       throw new Error("El insumo ya no existe — puede haber sido eliminado.");
     }
+    if (snap.data().zona !== input.zona || snap.data().activo === false) {
+      throw new Error("El insumo cambió de zona o fue desactivado. Vuelve a abrir el formulario.");
+    }
 
     const stockAnterior = (snap.data().stockActual as number) ?? 0;
     const delta = input.tipo === "descuento" ? -input.cantidad : input.cantidad;
-    // Nunca negativo: si el descuento pedido supera el stock real leído
-    // en este instante (por ejemplo, otro ajuste lo vació segundos antes),
-    // el stock queda en 0 en vez de pasar a negativo.
-    const stockNuevo = Math.max(stockAnterior + delta, 0);
+    // Si otra persona descontó stock mientras el formulario estaba abierto,
+    // rechazar el ajuste para conservar una cantidad y un historial coherentes.
+    if (stockAnterior + delta < 0) throw new Error("El stock cambió. La cantidad a descontar supera lo disponible.");
+    const stockNuevo = stockAnterior + delta;
 
     transaction.update(insumoRef, {
       stockActual: stockNuevo,

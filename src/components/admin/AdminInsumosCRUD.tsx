@@ -19,12 +19,18 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { useInsumos } from "@/hooks/useInsumos";
+import { CATEGORIAS, categoriaDe, normalizar } from "@/lib/operacion";
 import AlertasCompra from "@/components/shared/AlertasCompra";
 import type { Zona, TipoInsumo, Insumo } from "@/types/insumo";
 
 // Estado editable del formulario — todo como string para inputs controlados,
 // se castea a número/null recién al guardar.
 interface FormState {
+  categoria: string;
+  ubicacion: string;
+  stockObjetivo: string;
+  stockObjetivoFinDeSemana: string;
+  consumoDiarioEstimado: string;
   nombre: string;
   zona: Zona;
   tipo: TipoInsumo;
@@ -39,6 +45,7 @@ interface FormState {
 }
 
 const FORM_VACIO: FormState = {
+  categoria: "", ubicacion: "", stockObjetivo: "", stockObjetivoFinDeSemana: "", consumoDiarioEstimado: "",
   nombre: "",
   zona: "cocina",
   tipo: "externo",
@@ -71,6 +78,7 @@ export default function AdminInsumosCRUD() {
   } = useInsumos();
   const [eliminandoId, setEliminandoId] = useState<string | null>(null);
   const [busqueda, setBusqueda] = useState("");
+  const [categoriaFiltro, setCategoriaFiltro] = useState("");
   const [filtroZona, setFiltroZona] = useState<FiltroZona>("todas");
   const [filtroTipo, setFiltroTipo] = useState<FiltroTipo>("todos");
 
@@ -83,11 +91,12 @@ export default function AdminInsumosCRUD() {
     return insumos.filter((i) => {
       if (filtroZona !== "todas" && i.zona !== filtroZona) return false;
       if (filtroTipo !== "todos" && i.tipo !== filtroTipo) return false;
-      if (busqueda.trim() && !i.nombre.toLowerCase().includes(busqueda.trim().toLowerCase()))
+      if (categoriaFiltro && categoriaDe(i) !== categoriaFiltro) return false;
+      if (busqueda.trim() && !normalizar(`${i.nombre} ${i.ubicacion ?? ""} ${categoriaDe(i)}`).includes(normalizar(busqueda.trim())))
         return false;
       return true;
     });
-  }, [insumos, filtroZona, filtroTipo, busqueda]);
+  }, [insumos, filtroZona, filtroTipo, busqueda, categoriaFiltro]);
 
   // ── Abrir panel ──
   const abrirCreacion = () => {
@@ -100,6 +109,10 @@ export default function AdminInsumosCRUD() {
   const abrirEdicion = (insumo: Insumo) => {
     setEditandoId(insumo.id);
     setForm({
+      categoria: insumo.categoria ?? "", ubicacion: insumo.ubicacion ?? "",
+      stockObjetivo: insumo.stockObjetivo == null ? "" : String(insumo.stockObjetivo),
+      stockObjetivoFinDeSemana: insumo.stockObjetivoFinDeSemana == null ? "" : String(insumo.stockObjetivoFinDeSemana),
+      consumoDiarioEstimado: insumo.consumoDiarioEstimado == null ? "" : String(insumo.consumoDiarioEstimado),
       nombre: insumo.nombre,
       zona: insumo.zona,
       tipo: insumo.tipo,
@@ -139,6 +152,11 @@ export default function AdminInsumosCRUD() {
     if (f.tipo === "interno" && f.rendimientoPorLote.trim() !== "" && !f.loteUnidad.trim()) {
       e.loteUnidad = "Describe la unidad del lote (ej. 'bolitas por tanda').";
     }
+    for (const campo of ["stockActual", "stockMinimo", "stockMinimoFinDeSemana", "stockObjetivo", "stockObjetivoFinDeSemana", "consumoDiarioEstimado", "leadTimeDias", "diasAnticipacionAlerta", "rendimientoPorLote"] as const) {
+      if (f[campo].trim() && (!Number.isFinite(Number(f[campo])) || Number(f[campo]) < 0)) e[campo] = "Ingresa un número válido, cero o mayor.";
+    }
+    if (f.stockObjetivo.trim() && Number(f.stockObjetivo) < Number(f.stockMinimo)) e.stockObjetivo = "La meta debe ser igual o mayor al mínimo.";
+    if (f.stockObjetivoFinDeSemana.trim() && Number(f.stockObjetivoFinDeSemana) < Number(f.stockMinimoFinDeSemana || f.stockMinimo)) e.stockObjetivoFinDeSemana = "La meta debe ser igual o mayor al mínimo de fin de semana.";
     return e;
   };
 
@@ -150,6 +168,10 @@ export default function AdminInsumosCRUD() {
     if (Object.keys(e).length > 0) return;
 
     const datos = {
+      categoria: form.categoria.trim(), ubicacion: form.ubicacion.trim(),
+      stockObjetivo: form.stockObjetivo.trim() ? Number(form.stockObjetivo) : null,
+      stockObjetivoFinDeSemana: form.stockObjetivoFinDeSemana.trim() ? Number(form.stockObjetivoFinDeSemana) : null,
+      consumoDiarioEstimado: form.consumoDiarioEstimado.trim() ? Number(form.consumoDiarioEstimado) : null,
       nombre: form.nombre.trim(),
       zona: form.zona,
       tipo: form.tipo,
@@ -166,7 +188,7 @@ export default function AdminInsumosCRUD() {
           ? Number(form.rendimientoPorLote)
           : null,
       loteUnidad: form.tipo === "interno" ? form.loteUnidad.trim() : "",
-      activo: true,
+      activo: editandoId ? (insumos.find((i) => i.id === editandoId)?.activo ?? true) : true,
     };
 
     setGuardando(true);
@@ -270,6 +292,7 @@ export default function AdminInsumosCRUD() {
         textoBoton="Enviar recordatorio de preparación al equipo"
       />
 
+      <label className="mb-4 block text-sm">Categoría<select className="ops-input max-w-sm" value={categoriaFiltro} onChange={(e) => setCategoriaFiltro(e.target.value)}><option value="">Todas las categorías</option>{[...new Set(insumos.map(categoriaDe))].sort().map((c) => <option key={c}>{c}</option>)}</select></label>
       {/* Filtros */}
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="relative w-full sm:max-w-xs">
@@ -513,6 +536,10 @@ export default function AdminInsumosCRUD() {
                   />
                 </Campo>
 
+                <Campo label="Categoría"><input list="categorias-insumos" className={inputClase(false)} maxLength={80} value={form.categoria} onChange={(e) => actualizarCampo("categoria", e.target.value)} placeholder="Ej. Delivery, Masas, Bebidas" /><datalist id="categorias-insumos">{CATEGORIAS.map((c) => <option key={c} value={c} />)}</datalist></Campo>
+                <Campo label="Ubicación"><input className={inputClase(false)} maxLength={80} value={form.ubicacion} onChange={(e) => actualizarCampo("ubicacion", e.target.value)} placeholder="Ej. Almacén, refrigeradora, estación de delivery" /></Campo>
+                {([ ["stockObjetivo", "Meta disponible para el servicio"], ["stockObjetivoFinDeSemana", "Meta de viernes a domingo"], ["consumoDiarioEstimado", "Consumo diario estimado (opcional)"] ] as const).map(([campo, label]) => <Campo key={campo} label={label} error={errores[campo]}><input className={inputClase(!!errores[campo])} type="number" min="0" step="any" inputMode="decimal" value={form[campo]} onChange={(e) => actualizarCampo(campo, e.target.value)} placeholder="En la unidad de este insumo" /></Campo>)}
+                <p className="text-sm text-stone-500">La meta indica cuánto debe quedar disponible después de comprar o preparar. Sin una meta se usa el mínimo. El consumo estimado y los días de entrega permiten anticipar avisos; no son una predicción de ventas.</p>
                 {/* Zona y Tipo */}
                 <div className="grid grid-cols-2 gap-3">
                   <Campo label="Zona">

@@ -1,116 +1,108 @@
 rules_version = '2';
-
-// ─────────────────────────────────────────────────────────────
-// Pizza Republic — Inventario
-// El Custom Claim `rol` ("admin" | "cocina" | "salon") vive en el ID
-// token y se sincroniza desde usuarios/{uid} vía la Cloud Function
-// `sincronizarRolClaim` (onDocumentWritten, functions/index.js).
-//
-// Nota de diseño: `rol` ("cocina"/"salon") y `zona` en los documentos
-// de insumos/cierres/ajustes usan exactamente los mismos strings a
-// propósito — así una sola función (`esDeZona`) sirve para comparar
-// "¿este usuario pertenece a la zona de este documento?" sin tener
-// que mantener un mapeo rol→zona aparte.
-// ─────────────────────────────────────────────────────────────
-
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // ---------- Helpers ----------
-
-    function estaAutenticado() {
-      return request.auth != null;
-    }
-
+    function autenticado() { return request.auth != null; }
+    // El documento es la fuente de permisos: altas, bajas y cambios son inmediatos.
+    // activo ausente mantiene compatibilidad con los perfiles existentes.
+    function perfil() { return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data; }
     function rol() {
-      return request.auth.token.rol;
+      return exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
+        && perfil().get('activo', true) == true ? perfil().get('rol', null) : null;
     }
-
-    function esAdmin() {
-      return estaAutenticado() && rol() == 'admin';
+    function admin() { return autenticado() && rol() == 'admin'; }
+    function personal() { return autenticado() && rol() in ['admin', 'cocina', 'salon']; }
+    function zona(z) { return personal() && (rol() == 'admin' || rol() == z); }
+    function texto(t, maximo) { return t is string && t.size() <= maximo; }
+    function numero(n) { return n is number && n >= 0 && n <= 1000000000; }
+    function zonaValida(z) { return z in ['cocina', 'salon']; }
+    function insumoValido(d) {
+      return texto(d.nombre, 200) && d.nombre.size() > 0 && zonaValida(d.zona)
+        && d.tipo in ['interno', 'externo'] && texto(d.unidad, 80) && d.unidad.size() > 0
+        && numero(d.stockActual) && numero(d.stockMinimo) && d.activo is bool
+        && (d.get('stockMinimoFinDeSemana', null) == null || numero(d.stockMinimoFinDeSemana))
+        && texto(d.get('categoria', ''), 80) && texto(d.get('ubicacion', ''), 80)
+        && (d.get('stockObjetivo', null) == null || numero(d.stockObjetivo))
+        && (d.get('stockObjetivoFinDeSemana', null) == null || numero(d.stockObjetivoFinDeSemana))
+        && (d.get('consumoDiarioEstimado', null) == null || numero(d.consumoDiarioEstimado));
     }
-
-    // true si el usuario logueado pertenece a la zona indicada
-    // (cocina/salon) — no aplica a admin, que se valida aparte.
-    function esDeZona(zona) {
-      return estaAutenticado() && rol() == zona;
-    }
-
-    // ---------- usuarios ----------
-    // Solo el admin lee y escribe el padrón de empleados y sus roles.
-    // Escribir acá es lo que dispara (vía Cloud Function) la
-    // actualización del Custom Claim de cada persona.
     match /usuarios/{uid} {
-      allow read, write: if esAdmin();
+      allow read: if (autenticado() && request.auth.uid == uid) || admin();
+      allow create: if admin() || (autenticado() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['nombre', 'email', 'rol', 'activo', 'creadoEn'])
+        && request.resource.data.rol == null && request.resource.data.activo == true
+        && texto(request.resource.data.nombre, 200)
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.creadoEn == request.time);
+      allow update: if admin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rol', 'activo', 'actualizadoEn'])
+        && request.resource.data.rol in ['admin', 'cocina', 'salon', null]
+        && request.resource.data.get('activo', true) is bool
+        && (uid != request.auth.uid || (request.resource.data.rol == 'admin' && request.resource.data.get('activo', true) == true));
+      allow delete: if false;
     }
-
-    // ---------- insumos ----------
-    match /insumos/{insumoId} {
-      // Cualquier persona autenticada puede leer el catálogo completo
-      // — los dashboards de zona filtran client-side; no es
-      // información sensible y negar la lectura cruzada no aporta
-      // seguridad real, solo complicaría los hooks existentes.
-      allow read: if estaAutenticado();
-
-      // Alta, baja y cualquier cambio estructural (nombre, mínimos,
-      // zona, tipo, etc.) — exclusivo del admin. Cocina/Salón NUNCA
-      // crean ni borran insumos.
-      allow create, delete: if esAdmin();
-
-      // Cocina/Salón SOLO pueden ajustar el stock de insumos de su
-      // propia zona, y SOLO esos dos campos. `diff().affectedKeys()`
-      // rechaza cualquier intento de tocar stockMinimo, nombre, zona,
-      // etc. por esta vía — eso sigue siendo terreno exclusivo del
-      // admin.
-      allow update: if esAdmin()
-        || (
-          esDeZona(resource.data.zona)
-          && request.resource.data.diff(resource.data).affectedKeys()
-               .hasOnly(['stockActual', 'actualizadoEn'])
-          && request.resource.data.stockActual is number
-          && request.resource.data.stockActual >= 0
-        );
+    match /insumos/{id} {
+      allow read: if personal();
+      allow create: if admin() && insumoValido(request.resource.data);
+      allow delete: if admin();
+      allow update: if (admin() && insumoValido(request.resource.data)) || (
+        zona(resource.data.zona)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stockActual', 'actualizadoEn'])
+        && numero(request.resource.data.stockActual)
+        && request.resource.data.actualizadoEn == request.time);
     }
-
-    // ---------- cierres ----------
-    match /cierres/{cierreId} {
-      // Admin ve todo. Cocina/Salón solo ven el historial de SU zona
-      // (lo necesita ZoneDashboard para "último cierre hace X").
-      allow read: if esAdmin() || esDeZona(resource.data.zona);
-
-      // Alta limitada a la propia zona, y el `usuarioId` del
-      // documento tiene que ser el uid real de quien está autenticado
-      // (nadie puede registrar un cierre a nombre de otra persona).
-      allow create: if esAdmin()
-        || (
-          esDeZona(request.resource.data.zona)
-          && request.resource.data.usuarioId == request.auth.uid
-        );
-
-      // Un cierre ya confirmado es un registro histórico — nadie
-      // fuera del admin lo edita ni lo borra.
-      allow update, delete: if esAdmin();
+    match /cierres/{id} {
+      allow read: if zona(resource.data.zona);
+      allow create: if zona(request.resource.data.zona)
+        && request.resource.data.usuarioId == request.auth.uid
+        && request.resource.data.fechaHora == request.time
+        && request.resource.data.items is list && request.resource.data.items.size() <= 400;
+      allow update, delete: if admin();
     }
-
-    // ---------- ajustes ----------
-    match /ajustes/{ajusteId} {
-      // Misma lógica que cierres: cocina/salon leen y crean solo lo
-      // de su propia zona (necesario, por ejemplo, para un futuro
-      // historial de ajustes en el dashboard de zona); edición y
-      // borrado exclusivos del admin.
-      allow read: if esAdmin() || esDeZona(resource.data.zona);
-
-      allow create: if esAdmin()
-        || (
-          esDeZona(request.resource.data.zona)
-          && request.resource.data.usuarioId == request.auth.uid
-        );
-
-      allow update, delete: if esAdmin();
+    match /ajustes/{id} {
+      allow read: if zona(resource.data.zona);
+      allow create: if zona(request.resource.data.zona)
+        && request.resource.data.usuarioId == request.auth.uid
+        && request.resource.data.zona == get(/databases/$(database)/documents/insumos/$(request.resource.data.insumoId)).data.zona
+        && request.resource.data.tipo in ['descuento', 'reposicion']
+        && numero(request.resource.data.cantidad) && request.resource.data.cantidad > 0
+        && numero(request.resource.data.stockAnterior) && numero(request.resource.data.stockNuevo)
+        && texto(request.resource.data.motivo, 600) && request.resource.data.motivo.size() > 0
+        && request.resource.data.fechaHora == request.time;
+      allow update, delete: if admin();
     }
-
-    // Cualquier otra colección no contemplada: denegada por defecto
-    // (comportamiento implícito de Firestore Rules — no hace falta
-    // una regla explícita, se deja este comentario como constancia).
+    match /reportes/{id} {
+      allow read: if zona(resource.data.zona);
+      allow create: if zona(request.resource.data.zona)
+        && request.resource.data.keys().hasOnly(['insumoId', 'nombre', 'zona', 'tipo', 'nota', 'usuarioId', 'usuarioNombre', 'resuelto', 'fechaHora'])
+        && request.resource.data.usuarioId == request.auth.uid
+        && request.resource.data.zona == get(/databases/$(database)/documents/insumos/$(request.resource.data.insumoId)).data.zona
+        && texto(request.resource.data.nombre, 200) && texto(request.resource.data.usuarioNombre, 200)
+        && request.resource.data.tipo in ['poco', 'agotado', 'problema']
+        && texto(request.resource.data.nota, 500)
+        && (request.resource.data.tipo != 'problema' || request.resource.data.nota.size() > 0)
+        && request.resource.data.resuelto == false && request.resource.data.fechaHora == request.time;
+      allow update: if zona(resource.data.zona)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['resuelto', 'resueltoPor', 'resueltoEn'])
+        && request.resource.data.resuelto == true && request.resource.data.resueltoPor == request.auth.uid
+        && request.resource.data.resueltoEn == request.time;
+    }
+    match /tareasPlantilla/{id} {
+      allow read: if zona(resource.data.zona);
+      allow create, update: if admin() && request.resource.data.keys().hasOnly(['zona', 'etapa', 'texto', 'activo'])
+        && zonaValida(request.resource.data.zona) && request.resource.data.etapa in ['apertura', 'cierre']
+        && texto(request.resource.data.texto, 200) && request.resource.data.texto.size() > 0 && request.resource.data.activo is bool;
+    }
+    match /tareasTurno/{id} {
+      allow read: if zona(resource.data.zona);
+      allow create, update: if zona(request.resource.data.zona)
+        && request.resource.data.keys().hasOnly(['zona', 'fecha', 'turno', 'tareaId', 'texto', 'completada', 'usuarioId', 'usuarioNombre', 'actualizadoEn'])
+        && request.resource.data.usuarioId == request.auth.uid
+        && request.resource.data.fecha.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && request.resource.data.turno in ['mañana', 'tarde', 'noche']
+        && texto(request.resource.data.tareaId, 200) && texto(request.resource.data.texto, 200)
+        && texto(request.resource.data.usuarioNombre, 200) && request.resource.data.completada is bool
+        && id == request.resource.data.fecha + '_' + request.resource.data.turno + '_' + request.resource.data.zona + '_' + request.resource.data.tareaId
+        && request.resource.data.actualizadoEn == request.time;
+    }
   }
 }

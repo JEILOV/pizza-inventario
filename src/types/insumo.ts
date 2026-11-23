@@ -15,6 +15,11 @@ export interface Insumo {
   rendimientoPorLote: number | null;
   loteUnidad: string;
   activo: boolean;
+  categoria?: string;
+  ubicacion?: string;
+  stockObjetivo?: number | null;
+  stockObjetivoFinDeSemana?: number | null;
+  consumoDiarioEstimado?: number | null;
   actualizadoEn?: number; // Requerido por Firestore
 }
 
